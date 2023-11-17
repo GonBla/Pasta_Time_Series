@@ -235,19 +235,18 @@ legend("topright", legend = bar_labels, fill = c("skyblue", "lightcoral"))
 # Load req. libraries
 library(ggplot2)
 library(dplyr)
+library(lubridate)
 
-# Create a line plot for monthly values w/ quarterly sum annotations
-ggplot(low_performing_product, aes(x = DATE, y = QTY_B2_12, color = "QTY_B2_12")) +
+# Create line plot w/ diff. colors for each year
+ggplot(low_performing_product, aes(x = DATE, y = QTY_B2_12, color = factor(lubridate::year(DATE)))) +
   geom_line() +
   geom_point() +
-  geom_line(aes(y = PROMO_B2_12, color = "PROMO_B2_12")) +
-  geom_point(aes(y = PROMO_B2_12, color = "PROMO_B2_12")) +
-  labs(title = "Monthly Values of QTY_B2_12 and PROMO_B2_12",
+  labs(title = "QTY_B2_12 Sales Over the Years",
        x = "Date",
-       y = "Values",
-       color = "Legend") +
-  scale_color_manual(values = c("QTY_B2_12" = "blue", "PROMO_B2_12" = "red")) +
+       y = "QTY_B2_12",
+       color = "Year") +
   theme_minimal() +
+  scale_color_discrete(name = "Year") +
   theme(legend.position = "top") +
   theme(legend.title = element_blank()) +
   theme(plot.title = element_text(size = 16, face = "bold")) +
@@ -255,16 +254,57 @@ ggplot(low_performing_product, aes(x = DATE, y = QTY_B2_12, color = "QTY_B2_12")
   theme(legend.text = element_text(size = 12)) +
   theme(axis.text = element_text(size = 12)) +
   theme(axis.title = element_text(size = 14)) +
-  scale_x_date(breaks = "3 months", date_labels = "%b %Y") +
-  annotate("text", x = as.Date("2018-03-01"), y = max(low_performing_product$QTY_B2_12), label = "Q1 Sum", size = 4, color = "blue") +
-  annotate("text", x = as.Date("2018-06-01"), y = max(low_performing_product$QTY_B2_12), label = "Q2 Sum", size = 4, color = "blue") +
-  annotate("text", x = as.Date("2018-09-01"), y = max(low_performing_product$QTY_B2_12), label = "Q3 Sum", size = 4, color = "blue") +
-  annotate("text", x = as.Date("2018-12-01"), y = max(low_performing_product$QTY_B2_12), label = "Q4 Sum", size = 4, color = "blue") +
-  annotate("text", x = as.Date("2018-03-01"), y = max(low_performing_product$PROMO_B2_12), label = "Q1 Sum", size = 4, color = "red") +
-  annotate("text", x = as.Date("2018-06-01"), y = max(low_performing_product$PROMO_B2_12), label = "Q2 Sum", size = 4, color = "red") +
-  annotate("text", x = as.Date("2018-09-01"), y = max(low_performing_product$PROMO_B2_12), label = "Q3 Sum", size = 4, color = "red") +
-  annotate("text", x = as.Date("2018-12-01"), y = max(low_performing_product$PROMO_B2_12), label = "Q4 Sum", size = 4, color = "red") +
-  theme(plot.margin = margin(1, 1, 2, 1, "cm"))
+  scale_x_date(breaks = "1 year", date_labels = "%Y")
+```
+
+```{r}
+# Calculate sum of QTY_B2_12 for each month & year
+sum_qty_by_month <- low_performing_product %>%
+  group_by(month = month(DATE, label = TRUE, abbr = FALSE), year = year(DATE)) %>%
+  summarize(sum_qty = sum(QTY_B2_12), .groups = 'drop')
+
+# Create a line plot w/ sum of QTY_B2_12 for each month & year
+ggplot(sum_qty_by_month, aes(x = month, y = sum_qty, color = as.factor(year), group = year)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Sum of QTY_B2_12 Sales Over Time",
+       x = "Month",
+       y = "Sum of QTY_B2_12",
+       color = "Year") +
+  theme_minimal() +
+  scale_color_discrete(name = "Year") +
+  theme(legend.position = "top") +
+  theme(legend.title = element_blank()) +
+  theme(plot.title = element_text(size = 16, face = "bold")) +
+  theme(legend.text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  
+  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title = element_text(size = 14))
+```
+
+```{r}
+# Calculate sum of PROMO_B2_12 for each month & year
+sum_qty_by_month <- low_performing_product %>%
+  group_by(month = month(DATE, label = TRUE, abbr = FALSE), year = year(DATE)) %>%
+  summarize(sum_qty = sum(PROMO_B2_12), .groups = 'drop')
+
+# Create a line plot w/ sum of PROMO_B2_12 for each month & year
+ggplot(sum_qty_by_month, aes(x = month, y = sum_qty, color = as.factor(year), group = year)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Sum of PROMO_B2_12 Sales Over Time",
+       x = "Month",
+       y = "Sum of PROMO_B2_12",
+       color = "Year") +
+  theme_minimal() +
+  scale_color_discrete(name = "Year") +
+  theme(legend.position = "top") +
+  theme(legend.title = element_blank()) +
+  theme(plot.title = element_text(size = 16, face = "bold")) +
+  theme(legend.text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title = element_text(size = 14))
 ```
 
 **Splitting the data**
