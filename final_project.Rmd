@@ -307,6 +307,40 @@ ggplot(sum_qty_by_month, aes(x = month, y = sum_qty, color = as.factor(year), gr
   theme(axis.title = element_text(size = 14))
 ```
 
+```{r}
+# Calculate the percentage of total sales per month
+percentage_by_month <- low_performing_product %>%
+  group_by(month = month(DATE, label = TRUE, abbr = FALSE), year = year(DATE)) %>%
+  summarize(percentage = sum(QTY_B2_12) / sum(low_performing_product$QTY_B2_12) * 100, .groups = 'drop')
+
+# Create a boxplot for the percentage of total sales for each month
+ggplot(percentage_by_month, aes(x = month, y = percentage)) +
+  geom_boxplot() +
+  labs(title = "Percentage of Total Sales by Month",
+       x = "Month",
+       y = "Percentage of Total Sales") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1))
+```
+
+```{r}
+# Calculate the percentage of total sales per month
+percentage_by_month <- low_performing_product %>%
+  group_by(month = month(DATE, label = TRUE, abbr = FALSE), year = year(DATE)) %>%
+  summarize(percentage = sum(PROMO_B2_12) / sum(low_performing_product$PROMO_B2_12) * 100, .groups = 'drop')
+
+# Create a boxplot for the percentage of total sales for each month
+ggplot(percentage_by_month, aes(x = month, y = percentage)) +
+  geom_boxplot() +
+  labs(title = "Percentage of Total Promo Sales by Month",
+       x = "Month",
+       y = "Percentage of Total Sales") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1))
+```
+
 **Splitting the data**
 
 ```{r}
