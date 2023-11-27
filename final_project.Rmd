@@ -1,6 +1,6 @@
 ---
-title: "ADS506 Assignment 1.2 <Dataset name>"
-author: "Jesse Gutierrez"
+title: "ADS506 Final Proyect <Dataset name>"
+author: "Jesse Gutierrez and Gonzalo Blazquez"
 date: "`r Sys.Date()`"
 output:
   word_document: default
@@ -8,8 +8,11 @@ output:
 ---
 
 ```{r}
+# Load required packages
+library(ggseas)
 library(ggplot2)
 library(dplyr)
+library(forecast)
 ```
 
 **Data Source**
@@ -18,12 +21,11 @@ The dataset was found under the UCI publicly available repository with additiona
 
 Besides univariate time series data, the quantity sold is integrated by information on the presence or the absence of a promotion.
 
-https://archive.ics.uci.edu/dataset/611/hierarchical+sales+data 
-https://data.mendeley.com/datasets/njdkntcpc9/1
+<https://archive.ics.uci.edu/dataset/611/hierarchical+sales+data> <https://data.mendeley.com/datasets/njdkntcpc9/1>
 
 **Importing the Data**
 
-As the dataset file was not available for download under the UCI repository, an available CSV file was downloaded from Data Mendeley. This file was saved to a corresponding folder within the researchers computer and then imported into R using the ensuing code. 
+As the dataset file was not available for download under the UCI repository, an available CSV file was downloaded from Data Mendeley. This file was saved to a corresponding folder within the researchers computer and then imported into R using the ensuing code.
 
 ```{r}
 # Import the potential data set
@@ -43,12 +45,110 @@ cat('The sales in this dataset range from ', start_date, 'to', end_date)
 As evident with the above output, the sales the grocery store for the 118 items range from January 2, 2014 to December 31, 2018. This allows for five annual cycles of the sales of 118 different products within in a grocery store to compare the impact that the promotions made.
 
 ```{r}
+#####GB#####
+# Check for missing values
+sum(is.na(df))
+```
+
+```{r}
 # Convert the date column to the correct format
 df$DATE <- as.Date(df$DATE)
 
 # Display the output for verification
 head(df)
 ```
+
+```{r}
+####GB####
+date_sum <- df %>%
+  select(starts_with("QTY_B")) %>%
+  rowSums(na.rm = TRUE)
+
+date_total <- data.frame(
+  df$DATE,
+  Sales_Sum = unlist(date_sum)
+ 
+)
+head(date_total)
+```
+
+```{r}
+####GB####
+#time series Total sales plot
+sales.ts <- ts(date_total$Sales_Sum, start = c(2014,1), end = c(2018,12), freq = 12)
+plot(sales.ts, main="Sales over time" ,
+     xlab = "Time", ylab = "Sales",
+     ylim = c(0, 1400), bty = "l")
+
+ggseasonplot(sales.ts, year.labels=TRUE, year.labels.left=TRUE) +
+  ylab("sales") +
+  ggtitle("Seasonal plot: sales")
+```
+
+```{r}
+####GB####
+date_sum_b1 <- df %>%
+  select(starts_with("QTY_B1")) %>%
+  rowSums(na.rm = TRUE)
+date_sum_b2 <- df %>%
+  select(starts_with("QTY_B2")) %>%
+  rowSums(na.rm = TRUE)
+date_sum_b3 <- df %>%
+  select(starts_with("QTY_B3")) %>%
+  rowSums(na.rm = TRUE)
+date_sum_b4 <- df %>%
+  select(starts_with("QTY_B4")) %>%
+  rowSums(na.rm = TRUE)
+
+date_sum_pb1 <- df %>%
+  select(starts_with("PROMO_B1")) %>%
+  rowSums(na.rm = TRUE)
+date_sum_pb2 <- df %>%
+  select(starts_with("PROMO_B2")) %>%
+  rowSums(na.rm = TRUE)
+date_sum_pb3 <- df %>%
+  select(starts_with("PROMO_B3")) %>%
+  rowSums(na.rm = TRUE)
+date_sum_pb4 <- df %>%
+  select(starts_with("PROMO_B4")) %>%
+  rowSums(na.rm = TRUE)
+
+
+date_total_B <- data.frame(
+  df$DATE,
+  Sales_Sum = unlist(date_sum),
+  Sales_Sum_b1 = unlist(date_sum_b1),
+  Sales_Sum_b2 = unlist(date_sum_b2),
+  Sales_Sum_b3 = unlist(date_sum_b3),
+  Sales_Sum_b4 = unlist(date_sum_b4),
+  Promo_Sum_b1 = unlist(date_sum_pb1),
+  Promo_Sum_b2 = unlist(date_sum_pb2),
+  Promo_Sum_b3 = unlist(date_sum_pb3),
+  Promo_Sum_b4 = unlist(date_sum_pb4)
+ 
+)
+
+head(date_total_B, 20)
+```
+
+```{r}
+####GB####
+sales_b.ts <- ts(date_total_B[,c(3:6)], start = c(2014,1), end = c(2018,12), freq = 12)
+is.ts(sales_b.ts)
+ts.plot(sales_b.ts, col = 1:4, xlab = "Year", ylab = "Sales", main = "Sales by Brand")
+legend("topleft", colnames(sales_b.ts), lty = 1, col = 1:4, bty = "n")
+```
+
+```{r}
+####GB####
+promo_b.ts <- ts(date_total_B[,c(7:10)], start = c(2014,1), end = c(2018,12), freq = 12)
+
+ts.plot(promo_b.ts, col = 1:4, xlab = "Year", ylab = "Promos", main = "Promos by Brand")
+legend("topleft", colnames(promo_b.ts), lty = 1, col = 1:4, bty = "n")
+```
+
+
+
 
 ```{r}
 # Calculate total sums for sales
@@ -99,9 +199,7 @@ combined_data <- rbind(
   data.frame(Group = "Top Performers", Sales = top_performers$Sales_Sum, Promo = top_performers$Promo_Sum, Makeup = top_performers$Promo_Makeup),
   data.frame(Group = "Low Performers", Sales = low_performers$Sales_Sum, Promo = low_performers$Promo_Sum, Makeup = low_performers$Promo_Makeup)
 )
-```
 
-```{r}
 # Create a boxplot to compare low & high performing product sales
 ggplot(combined_data, aes(x = Group, y = Sales, fill = Group)) +
   geom_boxplot() +
@@ -117,6 +215,7 @@ ggplot(combined_data, aes(x = Group, y = Sales, fill = Group)) +
     axis.text.y = element_text(size = 12)
   )
 ```
+
 To no surprise, the top performing products had a significantly higher range of sales compared to low performers.
 
 ```{r}
@@ -125,7 +224,7 @@ ggplot(combined_data, aes(x = Group, y = Promo, fill = Group)) +
   geom_boxplot() +
   labs(x = "Performance Group", y = "Promo") +
   scale_fill_manual(values = c("Top Performers" = "blue", "Low Performers" = "red")) +
-  ggtitle("Promo Sales for Top vs. Low Performers") +
+  ggtitle("Promo Sales Duration for Top vs. Low Performers") +
   theme_minimal() +
   theme(
     plot.title = element_text(size = 16),
@@ -177,36 +276,382 @@ ggplot(low_performers, aes(x = Sales_Column, y = Sales_Sum, fill = Promo_Sum)) +
 When focusing on the lowest performing products, a focus was made on identifying items that received limited promotions. The idea is to identify products that may greatly benefit from marketing resources. In this instance, the products that appear to not have received much promotional resources is QTY_B2_12, QTY_B2_20, and QTY_B2_45.
 
 ```{r}
-# Create a subset w/ what appear to be the lowest promoted products among the low perfromers
-minimal_promo <- low_performers %>%
-  filter(Sales_Column %in% c("QTY_B2_12", "QTY_B2_20", "QTY_B2_45")) %>%
-  arrange(Promo_Makeup)
+# Isolate the low performing products
+low_performing_product <- low_performers$Sales_Column
 
-# Display the results to determine the lowest promoted item
-minimal_promo
+# Replace "QTY" w/ "PROMO"
+low_performing_product_promo <- sub("QTY", "PROMO", low_performing_product)
+
+# Combine all column names we intend on keeping
+selected_columns <- c("DATE", low_performing_product, low_performing_product_promo)
+
+# Subset df to include only selected columns
+low_perf_subset <- df[, selected_columns, drop = FALSE]
+
+# Display results
+head(low_perf_subset)
 ```
-
-We can now confirm that the lowest performing item with minimal promotional resources is QTY_B2_12. 
-
-**Time Series Plot**
 
 ```{r}
-# Create a line graph with annual sales
-ggplot(df, aes(x = DATE)) +
-  geom_line(aes(y = QTY_B2_12), color = "blue", linetype = "solid") +
-  geom_line(aes(y = PROMO_B2_12), color = "red", linetype = "dashed") +
-  labs(x = "Date", y = "Sales") +
-  ggtitle("Sales Comparison between QTY_B2_12 and PROMO_B2_12") +
-  scale_x_date(date_breaks = "12 months", date_labels = "%Y") +  
-  theme_minimal() +
-  theme(
-    plot.title = element_text(size = 16),
-    axis.title.x = element_text(size = 14),
-    axis.title.y = element_text(size = 14),
-    axis.text.x = element_text(size = 12),
-    axis.text.y = element_text(size = 12)
-  )
+# Select corresponding columns to subset into the 12 low performers
+selected_columns <- c("DATE", "QTY_B2_12", "PROMO_B2_12")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_12 <- low_perf_subset[, selected_columns, drop = FALSE]
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns <- c("DATE", "QTY_B3_7", "PROMO_B3_7")
+# Subset low_perf_subset to include only selected columns
+QTY_B3_7 <- low_perf_subset[, selected_columns, drop = FALSE]
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns <- c("DATE", "QTY_B2_11", "PROMO_B2_11")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_11 <- low_perf_subset[, selected_columns, drop = FALSE]
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns <- c("DATE", "QTY_B2_16", "PROMO_B2_16")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_16 <- low_perf_subset[, selected_columns, drop = FALSE]
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns <- c("DATE", "QTY_B3_13", "PROMO_B3_13")
+# Subset low_perf_subset to include only selected columns
+QTY_B3_13 <- low_perf_subset[, selected_columns, drop = FALSE]
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns <- c("DATE", "QTY_B3_1", "PROMO_B3_1")
+# Subset low_perf_subset to include only selected columns
+QTY_B3_1 <- low_perf_subset[, selected_columns, drop = FALSE]
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns <- c("DATE", "QTY_B3_20", "PROMO_B3_20")
+# Subset low_perf_subset to include only selected columns
+QTY_B3_20 <- low_perf_subset[, selected_columns, drop = FALSE]
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns <- c("DATE", "QTY_B2_45", "PROMO_B2_45")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_45 <- low_perf_subset[, selected_columns, drop = FALSE]
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns <- c("DATE", "QTY_B2_1", "PROMO_B2_1")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_1 <- low_perf_subset[, selected_columns, drop = FALSE]
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns <- c("DATE", "QTY_B2_20", "PROMO_B2_20")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_20 <- low_perf_subset[, selected_columns, drop = FALSE]
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns <- c("DATE", "QTY_B2_19", "PROMO_B2_19")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_19 <- low_perf_subset[, selected_columns, drop = FALSE]
 ```
+
+```{r}
+# Select corresponding columns to subset into the 12 low performers
+selected_columns_2_12 <- c("DATE", "QTY_B2_12", "PROMO_B2_12")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_12 <- low_perf_subset[, selected_columns_2_12, drop = FALSE]
+
+# Calculate metrics for QTY_B2_12
+days_wo_promo_2_12 <- sum(QTY_B2_12$PROMO_B2_12 == 0)
+days_w_promo_2_12 <- sum(QTY_B2_12$PROMO_B2_12 == 1)
+
+avg_qty_promo_1_2_12 <- mean(QTY_B2_12$QTY_B2_12[QTY_B2_12$PROMO_B2_12 == 1])
+avg_qty_promo_0_2_12 <- mean(QTY_B2_12$QTY_B2_12[QTY_B2_12$PROMO_B2_12 == 0])
+
+# Create a data frame with the results for QTY_B2_12
+result_table_2_12 <- data.frame(
+  Product = "QTY_B2_12",
+  Days_wo_Promo = days_wo_promo_2_12,
+  Days_w_Promo = days_w_promo_2_12,
+  Avg_QTY_Promo_1 = avg_qty_promo_1_2_12,
+  Avg_QTY_Promo_0 = avg_qty_promo_0_2_12
+)
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns_3_6 <- c("DATE", "QTY_B3_6", "PROMO_B3_6")
+# Subset low_perf_subset to include only selected columns
+QTY_B3_6 <- low_perf_subset[, selected_columns_3_6, drop = FALSE]
+
+# Calculate metrics for QTY_B3_6
+days_wo_promo_3_6 <- sum(QTY_B3_6$PROMO_B3_6 == 0)
+days_w_promo_3_6 <- sum(QTY_B3_6$PROMO_B3_6 == 1)
+
+avg_qty_promo_1_3_6 <- mean(QTY_B3_6$QTY_B3_6[QTY_B3_6$PROMO_B3_6 == 1])
+avg_qty_promo_0_3_6 <- mean(QTY_B3_6$QTY_B3_6[QTY_B3_6$PROMO_B3_6 == 0])
+
+# Create a data frame with the results for QTY_B3_6
+result_table_3_6 <- data.frame(
+  Product = "QTY_B3_6",
+  Days_wo_Promo = days_wo_promo_3_6,
+  Days_w_Promo = days_w_promo_3_6,
+  Avg_QTY_Promo_1 = avg_qty_promo_1_3_6,
+  Avg_QTY_Promo_0 = avg_qty_promo_0_3_6
+)
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns_3_7 <- c("DATE", "QTY_B3_7", "PROMO_B3_7")
+# Subset low_perf_subset to include only selected columns
+QTY_B3_7 <- low_perf_subset[, selected_columns_3_7, drop = FALSE]
+
+# Calculate metrics for QTY_B3_7
+days_wo_promo_3_7 <- sum(QTY_B3_7$PROMO_B3_7 == 0)
+days_w_promo_3_7 <- sum(QTY_B3_7$PROMO_B3_7 == 1)
+
+avg_qty_promo_1_3_7 <- mean(QTY_B3_7$QTY_B3_7[QTY_B3_7$PROMO_B3_7 == 1])
+avg_qty_promo_0_3_7 <- mean(QTY_B3_7$QTY_B3_7[QTY_B3_7$PROMO_B3_7 == 0])
+
+# Create a data frame with the results for QTY_B3_7
+result_table_3_7 <- data.frame(
+  Product = "QTY_B3_7",
+  Days_wo_Promo = days_wo_promo_3_7,
+  Days_w_Promo = days_w_promo_3_7,
+  Avg_QTY_Promo_1 = avg_qty_promo_1_3_7,
+  Avg_QTY_Promo_0 = avg_qty_promo_0_3_7
+)
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns_2_11 <- c("DATE", "QTY_B2_11", "PROMO_B2_11")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_11 <- low_perf_subset[, selected_columns_2_11, drop = FALSE]
+
+# Calculate metrics for QTY_B2_11
+days_wo_promo_2_11 <- sum(QTY_B2_11$PROMO_B2_11 == 0)
+days_w_promo_2_11 <- sum(QTY_B2_11$PROMO_B2_11 == 1)
+
+avg_qty_promo_1_2_11 <- mean(QTY_B2_11$QTY_B2_11[QTY_B2_11$PROMO_B2_11 == 1])
+avg_qty_promo_0_2_11 <- mean(QTY_B2_11$QTY_B2_11[QTY_B2_11$PROMO_B2_11 == 0])
+
+# Create a data frame with the results for QTY_B2_11
+result_table_2_11 <- data.frame(
+  Product = "QTY_B2_11",
+  Days_wo_Promo = days_wo_promo_2_11,
+  Days_w_Promo = days_w_promo_2_11,
+  Avg_QTY_Promo_1 = avg_qty_promo_1_2_11,
+  Avg_QTY_Promo_0 = avg_qty_promo_0_2_11
+)
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns_2_16 <- c("DATE", "QTY_B2_16", "PROMO_B2_16")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_16 <- low_perf_subset[, selected_columns_2_16, drop = FALSE]
+
+# Calculate metrics for QTY_B2_16
+days_wo_promo_2_16 <- sum(QTY_B2_16$PROMO_B2_16 == 0)
+days_w_promo_2_16 <- sum(QTY_B2_16$PROMO_B2_16 == 1)
+
+avg_qty_promo_1_2_16 <- mean(QTY_B2_16$QTY_B2_16[QTY_B2_16$PROMO_B2_16 == 1])
+avg_qty_promo_0_2_16 <- mean(QTY_B2_16$QTY_B2_16[QTY_B2_16$PROMO_B2_16 == 0])
+
+# Create a data frame with the results for QTY_B2_16
+result_table_2_16 <- data.frame(
+  Product = "QTY_B2_16",
+  Days_wo_Promo = days_wo_promo_2_16,
+  Days_w_Promo = days_w_promo_2_16,
+  Avg_QTY_Promo_1 = avg_qty_promo_1_2_16,
+  Avg_QTY_Promo_0 = avg_qty_promo_0_2_16
+)
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns_3_13 <- c("DATE", "QTY_B3_13", "PROMO_B3_13")
+# Subset low_perf_subset to include only selected columns
+QTY_B3_13 <- low_perf_subset[, selected_columns_3_13, drop = FALSE]
+
+# Calculate metrics for QTY_B3_13
+days_wo_promo_3_13 <- sum(QTY_B3_13$PROMO_B3_13 == 0)
+days_w_promo_3_13 <- sum(QTY_B3_13$PROMO_B3_13 == 1)
+
+avg_qty_promo_1_3_13 <- mean(QTY_B3_13$QTY_B3_13[QTY_B3_13$PROMO_B3_13 == 1])
+avg_qty_promo_0_3_13 <- mean(QTY_B3_13$QTY_B3_13[QTY_B3_13$PROMO_B3_13 == 0])
+
+# Create a data frame with the results for QTY_B3_13
+result_table_3_13 <- data.frame(
+  Product = "QTY_B3_13",
+  Days_wo_Promo = days_wo_promo_3_13,
+  Days_w_Promo = days_w_promo_3_13,
+  Avg_QTY_Promo_1 = avg_qty_promo_1_3_13,
+  Avg_QTY_Promo_0 = avg_qty_promo_0_3_13
+)
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns_3_1 <- c("DATE", "QTY_B3_1", "PROMO_B3_1")
+# Subset low_perf_subset to include only selected columns
+QTY_B3_1 <- low_perf_subset[, selected_columns_3_1, drop = FALSE]
+
+# Calculate metrics for QTY_B3_1
+days_wo_promo_3_1 <- sum(QTY_B3_1$PROMO_B3_1 == 0)
+days_w_promo_3_1 <- sum(QTY_B3_1$PROMO_B3_1 == 1)
+
+avg_qty_promo_1_3_1 <- mean(QTY_B3_1$QTY_B3_1[QTY_B3_1$PROMO_B3_1 == 1])
+avg_qty_promo_0_3_1 <- mean(QTY_B3_1$QTY_B3_1[QTY_B3_1$PROMO_B3_1 == 0])
+
+# Create a data frame with the results for QTY_B3_1
+result_table_3_1 <- data.frame(
+  Product = "QTY_B3_1",
+  Days_wo_Promo = days_wo_promo_3_1,
+  Days_w_Promo = days_w_promo_3_1,
+  Avg_QTY_Promo_1 = avg_qty_promo_1_3_1,
+  Avg_QTY_Promo_0 = avg_qty_promo_0_3_1
+)
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns_3_20 <- c("DATE", "QTY_B3_20", "PROMO_B3_20")
+# Subset low_perf_subset to include only selected columns
+QTY_B3_20 <- low_perf_subset[, selected_columns_3_20, drop = FALSE]
+
+# Calculate metrics for QTY_B3_20
+days_wo_promo_3_20 <- sum(QTY_B3_20$PROMO_B3_20 == 0)
+days_w_promo_3_20 <- sum(QTY_B3_20$PROMO_B3_20 == 1)
+
+avg_qty_promo_1_3_20 <- mean(QTY_B3_20$QTY_B3_20[QTY_B3_20$PROMO_B3_20 == 1])
+avg_qty_promo_0_3_20 <- mean(QTY_B3_20$QTY_B3_20[QTY_B3_20$PROMO_B3_20 == 0])
+
+# Create a data frame with the results for QTY_B3_20
+result_table_3_20 <- data.frame(
+  Product = "QTY_B3_20",
+  Days_wo_Promo = days_wo_promo_3_20,
+  Days_w_Promo = days_w_promo_3_20,
+  Avg_QTY_Promo_1 = avg_qty_promo_1_3_20,
+  Avg_QTY_Promo_0 = avg_qty_promo_0_3_20
+)
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns_2_45 <- c("DATE", "QTY_B2_45", "PROMO_B2_45")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_45 <- low_perf_subset[, selected_columns_2_45, drop = FALSE]
+
+# Calculate metrics for QTY_B2_45
+days_wo_promo_2_45 <- sum(QTY_B2_45$PROMO_B2_45 == 0)
+days_w_promo_2_45 <- sum(QTY_B2_45$PROMO_B2_45 == 1)
+
+avg_qty_promo_1_2_45 <- mean(QTY_B2_45$QTY_B2_45[QTY_B2_45$PROMO_B2_45 == 1])
+avg_qty_promo_0_2_45 <- mean(QTY_B2_45$QTY_B2_45[QTY_B2_45$PROMO_B2_45 == 0])
+
+# Create a data frame with the results for QTY_B2_45
+result_table_2_45 <- data.frame(
+  Product = "QTY_B2_45",
+  Days_wo_Promo = days_wo_promo_2_45,
+  Days_w_Promo = days_w_promo_2_45,
+  Avg_QTY_Promo_1 = avg_qty_promo_1_2_45,
+  Avg_QTY_Promo_0 = avg_qty_promo_0_2_45
+)
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns_2_1 <- c("DATE", "QTY_B2_1", "PROMO_B2_1")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_1 <- low_perf_subset[, selected_columns_2_1, drop = FALSE]
+
+# Calculate metrics for QTY_B2_1
+days_wo_promo_2_1 <- sum(QTY_B2_1$PROMO_B2_1 == 0)
+days_w_promo_2_1 <- sum(QTY_B2_1$PROMO_B2_1 == 1)
+
+avg_qty_promo_1_2_1 <- mean(QTY_B2_1$QTY_B2_1[QTY_B2_1$PROMO_B2_1 == 1])
+avg_qty_promo_0_2_1 <- mean(QTY_B2_1$QTY_B2_1[QTY_B2_1$PROMO_B2_1 == 0])
+
+# Create a data frame with the results for QTY_B2_1
+result_table_2_1 <- data.frame(
+  Product = "QTY_B2_1",
+  Days_wo_Promo = days_wo_promo_2_1,
+  Days_w_Promo = days_w_promo_2_1,
+  Avg_QTY_Promo_1 = avg_qty_promo_1_2_1,
+  Avg_QTY_Promo_0 = avg_qty_promo_0_2_1
+)
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns_2_20 <- c("DATE", "QTY_B2_20", "PROMO_B2_20")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_20 <- low_perf_subset[, selected_columns_2_20, drop = FALSE]
+
+# Calculate metrics for QTY_B2_20
+days_wo_promo_2_20 <- sum(QTY_B2_20$PROMO_B2_20 == 0)
+days_w_promo_2_20 <- sum(QTY_B2_20$PROMO_B2_20 == 1)
+
+avg_qty_promo_1_2_20 <- mean(QTY_B2_20$QTY_B2_20[QTY_B2_20$PROMO_B2_20 == 1])
+avg_qty_promo_0_2_20 <- mean(QTY_B2_20$QTY_B2_20[QTY_B2_20$PROMO_B2_20 == 0])
+
+# Create a data frame with the results for QTY_B2_20
+result_table_2_20 <- data.frame(
+  Product = "QTY_B2_20",
+  Days_wo_Promo = days_wo_promo_2_20,
+  Days_w_Promo = days_w_promo_2_20,
+  Avg_QTY_Promo_1 = avg_qty_promo_1_2_20,
+  Avg_QTY_Promo_0 = avg_qty_promo_0_2_20
+)
+
+# Select corresponding columns to subset into the 12 low performers
+selected_columns_2_19 <- c("DATE", "QTY_B2_19", "PROMO_B2_19")
+# Subset low_perf_subset to include only selected columns
+QTY_B2_19 <- low_perf_subset[, selected_columns_2_19, drop = FALSE]
+
+# Calculate metrics for QTY_B2_19
+days_wo_promo_2_19 <- sum(QTY_B2_19$PROMO_B2_19 == 0)
+days_w_promo_2_19 <- sum(QTY_B2_19$PROMO_B2_19 == 1)
+
+avg_qty_promo_1_2_19 <- mean(QTY_B2_19$QTY_B2_19[QTY_B2_19$PROMO_B2_19 == 1])
+avg_qty_promo_0_2_19 <- mean(QTY_B2_19$QTY_B2_19[QTY_B2_19$PROMO_B2_19 == 0])
+
+# Create a data frame with the results for QTY_B2_19
+result_table_2_19 <- data.frame(
+  Product = "QTY_B2_19",
+  Days_wo_Promo = days_wo_promo_2_19,
+  Days_w_Promo = days_w_promo_2_19,
+  Avg_QTY_Promo_1 = avg_qty_promo_1_2_19,
+  Avg_QTY_Promo_0 = avg_qty_promo_0_2_19
+)
+
+# Combine all results into a single table
+result_table_combined <- rbind(
+  result_table_2_12, result_table_3_6, result_table_3_7, result_table_2_11, result_table_2_16,
+  result_table_3_13, result_table_3_1, result_table_3_20, result_table_2_45, result_table_2_1,
+  result_table_2_20, result_table_2_19
+)
+
+# Display results
+result_table_combined
+```
+
+```{r}
+# Melt the data to long format for easy plotting
+result_table_combined_long <- reshape2::melt(result_table_combined, id.vars = "Product")
+
+# Filter the columns
+result_table_combined_long_filtered <- result_table_combined_long %>%
+  filter(variable %in% c("Avg_QTY_Promo_1", "Avg_QTY_Promo_0"))
+
+# Plot using ggplot
+ggplot(result_table_combined_long_filtered, aes(x = Product, y = value, fill = variable)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Average Quantity for Promo Types",
+       x = "Product",
+       y = "Average Quantity") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+As the plot can show, the majority of sales are dependent on there being a promotion. This is particularly true for product B2_12 as all sales were solely when there was a promotion. 
+
+```{r}
+# Melt the data to long format for easy plotting
+result_table_combined_long <- reshape2::melt(result_table_combined, id.vars = "Product")
+
+# Filter the columns
+result_table_combined_long_filtered <- result_table_combined_long %>%
+  filter(variable %in% c("Days_wo_Promo", "Days_w_Promo"))
+
+# Plot using ggplot
+ggplot(result_table_combined_long_filtered, aes(x = Product, y = value, fill = variable)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Days with and without Promo",
+       x = "Product",
+       y = "Count of Days") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+This plot displays the makeup of total days each product sold with and without a promotion. This can illustrate the difference in promotional resource allocation between the low performing products
+
+**Time Series Plot**
 
 ```{r}
 # Isolate the dataset to just include the product of interest
@@ -217,69 +662,32 @@ head(low_performing_product)
 ```
 
 ```{r}
-# Create a histogram comparing total sum of QTY_B2_12 and PROMO_B2_12
-hist_data <- c(sum(low_performing_product$QTY_B2_12), sum(low_performing_product$PROMO_B2_12))
-
-# Create labels for the plot
-bar_labels <- c("QTY_B2_12", "PROMO_B2_12")
-
-# Plot the histogram
-barplot(hist_data, names.arg = bar_labels, col = c("skyblue", "lightcoral"), main = "Total Sum Comparison",
-        xlab = "Columns", ylab = "Total Sum")
-
-# Add a legend
-legend("topright", legend = bar_labels, fill = c("skyblue", "lightcoral"))
+# Create bar plot comparing total days w/ promotion
+ggplot(low_performing_product, aes(x = factor(PROMO_B2_12), y = QTY_B2_12, fill = factor(PROMO_B2_12))) +
+  geom_bar(stat = "summary", fun = "sum", position = "dodge") +
+  labs(title = "Total Values of QTY_B2_12 by PROMO_B2_12",
+       x = "PROMO_B2_12",
+       y = "Total QTY_B2_12") +
+  scale_fill_manual(values = c("lightblue", "lightgreen")) +
+  theme_minimal()
 ```
 
 ```{r}
-# Load req. libraries
-library(ggplot2)
-library(dplyr)
-library(lubridate)
+# Extract year & month from DATE
+low_performing_product$YearMonth <- format(low_performing_product$DATE, "%Y-%m")
+low_performing_product$Year <- format(low_performing_product$DATE, "%Y")
 
-# Create line plot w/ diff. colors for each year
-ggplot(low_performing_product, aes(x = DATE, y = QTY_B2_12, color = factor(lubridate::year(DATE)))) +
+# Create overlapping line plots for each year with months on the x-axis
+ggplot(low_performing_product, aes(x = YearMonth, y = PROMO_B2_12, group = Year, color = Year)) +
   geom_line() +
-  geom_point() +
-  labs(title = "QTY_B2_12 Sales Over the Years",
-       x = "Date",
-       y = "QTY_B2_12",
-       color = "Year") +
-  theme_minimal() +
-  scale_color_discrete(name = "Year") +
-  theme(legend.position = "top") +
-  theme(legend.title = element_blank()) +
-  theme(plot.title = element_text(size = 16, face = "bold")) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  theme(legend.text = element_text(size = 12)) +
-  theme(axis.text = element_text(size = 12)) +
-  theme(axis.title = element_text(size = 14)) +
-  scale_x_date(breaks = "1 year", date_labels = "%Y")
-```
-
-```{r}
-# Calculate sum of QTY_B2_12 for each month & year
-sum_qty_by_month <- low_performing_product %>%
-  group_by(month = month(DATE, label = TRUE, abbr = FALSE), year = year(DATE)) %>%
-  summarize(sum_qty = sum(QTY_B2_12), .groups = 'drop')
-
-# Create a line plot w/ sum of QTY_B2_12 for each month & year
-ggplot(sum_qty_by_month, aes(x = month, y = sum_qty, color = as.factor(year), group = year)) +
-  geom_line() +
-  geom_point() +
-  labs(title = "Sum of QTY_B2_12 Sales Over Time",
+  labs(title = "Overlapping Line Plots of PROMO_B2_12 by Year with Months",
        x = "Month",
-       y = "Sum of QTY_B2_12",
-       color = "Year") +
+       y = "PROMO_B2_12") +
   theme_minimal() +
-  scale_color_discrete(name = "Year") +
-  theme(legend.position = "top") +
-  theme(legend.title = element_blank()) +
-  theme(plot.title = element_text(size = 16, face = "bold")) +
-  theme(legend.text = element_text(size = 12)) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  
-  theme(axis.text = element_text(size = 12)) +
-  theme(axis.title = element_text(size = 14))
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        axis.text.x.bottom = element_text(size = 8),
+        axis.text.x.top = element_text(size = 8)) +
+  coord_cartesian(ylim = c(0, 1))
 ```
 
 ```{r}
@@ -308,37 +716,28 @@ ggplot(sum_qty_by_month, aes(x = month, y = sum_qty, color = as.factor(year), gr
 ```
 
 ```{r}
-# Calculate the percentage of total sales per month
-percentage_by_month <- low_performing_product %>%
+# Calculate sum of QTY_B2_12 for each month & year
+sum_qty_by_month <- low_performing_product %>%
   group_by(month = month(DATE, label = TRUE, abbr = FALSE), year = year(DATE)) %>%
-  summarize(percentage = sum(QTY_B2_12) / sum(low_performing_product$QTY_B2_12) * 100, .groups = 'drop')
+  summarize(sum_qty = sum(QTY_B2_12), .groups = 'drop')
 
-# Create a boxplot for the percentage of total sales for each month
-ggplot(percentage_by_month, aes(x = month, y = percentage)) +
-  geom_boxplot() +
-  labs(title = "Percentage of Total Sales by Month",
+# Create a line plot w/ sum of QTY_B2_12 for each month & year
+ggplot(sum_qty_by_month, aes(x = month, y = sum_qty, color = as.factor(year), group = year)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Sum of QTY_B2_12 Sales Over Time",
        x = "Month",
-       y = "Percentage of Total Sales") +
+       y = "Sum of QTY_B2_12",
+       color = "Year") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_y_continuous(labels = scales::percent_format(scale = 1))
-```
-
-```{r}
-# Calculate the percentage of total sales per month
-percentage_by_month <- low_performing_product %>%
-  group_by(month = month(DATE, label = TRUE, abbr = FALSE), year = year(DATE)) %>%
-  summarize(percentage = sum(PROMO_B2_12) / sum(low_performing_product$PROMO_B2_12) * 100, .groups = 'drop')
-
-# Create a boxplot for the percentage of total sales for each month
-ggplot(percentage_by_month, aes(x = month, y = percentage)) +
-  geom_boxplot() +
-  labs(title = "Percentage of Total Promo Sales by Month",
-       x = "Month",
-       y = "Percentage of Total Sales") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_y_continuous(labels = scales::percent_format(scale = 1))
+  scale_color_discrete(name = "Year") +
+  theme(legend.position = "top") +
+  theme(legend.title = element_blank()) +
+  theme(plot.title = element_text(size = 16, face = "bold")) +
+  theme(legend.text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  
+  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title = element_text(size = 14))
 ```
 
 **Splitting the data**
@@ -356,9 +755,6 @@ cat("Validation Set Dimensions:", dim(validation_set), "\n")
 **Building Time Series Models**
 
 ```{r}
-# Load req. libraries
-library(forecast)
-
 # Create time series object for training set - QTY_B2_12
 ts_train_qty <- ts(training_set$QTY_B2_12, frequency = 365)
 
@@ -406,6 +802,34 @@ validation_rmse_promo <- sqrt(mean(validation_residuals_promo^2))
 cat("Validation Set RMSE for PROMO_B2_12:", validation_rmse_promo, "\n")
 ```
 
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B2_12 ~ DATE + PROMO_B2_12, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B2_12)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B2_12",
+       x = "Date",
+       y = "QTY_B2_12") +
+  theme_minimal()
+```
+This shows that the sales of product B2_12 have been trending downward through time at a rate of 0.000279 per date, but this value does increase by 1.554 during a promo.
+
+```{r}
+# Calculate Mean Squared Error (MSE)
+mse <- mean((validation_set$QTY_B2_12 - validation_set$predicted_qty)^2)
+
+# Print the MSE
+cat("Mean Squared Error (MSE):", mse, "\n")
+```
+
 **Discussion**
 
-For this project, I was tasked with identifying with low performing item can benefit from promotional material. After reviewing the impact that promotions had on the top 10% of performing products, I decided to further familiarize myself with product QTY_B2_12 with only 1895 sales of which 2.87% account from marketing efforts. The goal is to conduct a timer series analysis to determine during which periods can this product benefit from promotions and then forecast the difference that marketing efforts can have on upcoming months. The generated information can serve as critical information for businesses to ensure sufficient inventory, confirm marketing efforts successful, understand the impact of promotions, determine seasonality, and increase sales. As a stakeholder overseeing four national pasta brands, I would want to find strategies to best improve ROI on promotional efforts for product QTY_B2_12 to increase sales to outperform the bottom 10% of products. 
+For this project, I was tasked with identifying with low performing item can benefit from promotional material. After reviewing the impact that promotions had on the top 10% of performing products, I decided to further familiarize myself with product QTY_B2_12 with only 1895 sales of which 2.87% account from marketing efforts. The goal is to conduct a timer series analysis to determine during which periods can this product benefit from promotions and then forecast the difference that marketing efforts can have on upcoming months. The generated information can serve as critical information for businesses to ensure sufficient inventory, confirm marketing efforts successful, understand the impact of promotions, determine seasonality, and increase sales. As a stakeholder overseeing four national pasta brands, I would want to find strategies to best improve ROI on promotional efforts for product QTY_B2_12 to increase sales to outperform the bottom 10% of products.
