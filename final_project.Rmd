@@ -744,8 +744,8 @@ ggplot(sum_qty_by_month, aes(x = month, y = sum_qty, color = as.factor(year), gr
 
 ```{r}
 # Split the data into training (2014-01-02 to 2017-12-31) and validation (2018-01-31 to 2018-12-31)
-training_set <- subset(low_performing_product, DATE >= "2014-01-02" & DATE <= "2017-12-31")
-validation_set <- subset(low_performing_product, DATE >= "2018-01-31" & DATE <= "2018-12-31")
+training_set <- subset(df, DATE >= "2014-01-02" & DATE <= "2017-12-31")
+validation_set <- subset(df, DATE >= "2018-01-31" & DATE <= "2018-12-31")
 
 # Display the dimensions of the training and validation sets
 cat("Training Set Dimensions:", dim(training_set), "\n")
@@ -802,6 +802,8 @@ validation_rmse_promo <- sqrt(mean(validation_residuals_promo^2))
 cat("Validation Set RMSE for PROMO_B2_12:", validation_rmse_promo, "\n")
 ```
 
+## Linear regression model for QTY_B2_12
+
 ```{r}
 # Build a linear regression model
 linear_model <- lm(QTY_B2_12 ~ DATE + PROMO_B2_12, data = training_set)
@@ -819,15 +821,338 @@ ggplot(validation_set, aes(x = DATE, y = QTY_B2_12)) +
        x = "Date",
        y = "QTY_B2_12") +
   theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B2_12 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
 ```
 This shows that the sales of product B2_12 have been trending downward through time at a rate of 0.000279 per date, but this value does increase by 1.554 during a promo.
 
-```{r}
-# Calculate Mean Squared Error (MSE)
-mse <- mean((validation_set$QTY_B2_12 - validation_set$predicted_qty)^2)
+## Linear regression model for QTY_B3_6
 
-# Print the MSE
-cat("Mean Squared Error (MSE):", mse, "\n")
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B3_6 ~ DATE + PROMO_B3_6, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B3_6)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B3_6",
+       x = "Date",
+       y = "QTY_B3_6") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B3_6 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+```
+
+## Linear regression model for QTY_B3_7
+
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B3_7 ~ DATE + PROMO_B3_7, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B3_7)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B3_7",
+       x = "Date",
+       y = "QTY_B3_7") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B3_7 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+```
+Promotional efforts yielded the highest impact on this product as it is estimated to increase sales by 3 units each day.
+
+## Linear regression model for QTY_B2_11
+
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B2_11 ~ DATE + PROMO_B2_11, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B2_11)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B2_11",
+       x = "Date",
+       y = "QTY_B2_11") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B2_11 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+```
+
+## Linear regression model for QTY_B2_16
+
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B2_16 ~ DATE + PROMO_B2_16, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B2_16)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B2_16",
+       x = "Date",
+       y = "QTY_B2_16") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B2_16 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+```
+
+## Linear regression model for QTY_B3_13
+
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B3_13 ~ DATE + PROMO_B3_13, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B3_13)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B3_13",
+       x = "Date",
+       y = "QTY_B3_13") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B3_13 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+```
+
+## Linear regression model for QTY_B3_1
+
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B3_1 ~ DATE + PROMO_B3_1, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B3_1)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B3_1",
+       x = "Date",
+       y = "QTY_B3_1") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B3_1 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+```
+
+## Linear regression model for QTY_B3_20
+
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B3_20 ~ DATE + PROMO_B3_20, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B3_20)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B3_20",
+       x = "Date",
+       y = "QTY_B3_20") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B3_20 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+```
+
+## Linear regression model for QTY_B2_45
+
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B2_45 ~ DATE + PROMO_B2_45, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B2_45)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B2_45",
+       x = "Date",
+       y = "QTY_B2_45") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B2_45 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+```
+
+## Linear regression model for QTY_B2_45
+
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B2_45 ~ DATE + PROMO_B2_45, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B2_45)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B2_45",
+       x = "Date",
+       y = "QTY_B2_45") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B2_45 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+```
+
+## Linear regression model for QTY_B2_1
+
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B2_1 ~ DATE + PROMO_B2_1, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B2_1)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B2_1",
+       x = "Date",
+       y = "QTY_B2_1") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B2_1 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+```
+
+## Linear regression model for QTY_B2_20
+
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B2_20 ~ DATE + PROMO_B2_20, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B2_20)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B2_20",
+       x = "Date",
+       y = "QTY_B2_20") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B2_20 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+```
+
+## Linear regression model for QTY_B2_19
+
+```{r}
+# Build a linear regression model
+linear_model <- lm(QTY_B2_19 ~ DATE + PROMO_B2_19, data = training_set)
+
+# Display the summary of the model
+summary(linear_model)
+
+# Make predictions on the validation data
+validation_set$predicted_qty <- predict(linear_model, newdata = validation_set)
+
+# Plot actual vs. predicted
+ggplot(validation_set, aes(x = DATE, y = QTY_B2_19)) +
+  geom_line(aes(y = predicted_qty), color = "blue") +
+  labs(title = "Linear Regression Model - Actual vs. Predicted QTY_B2_19",
+       x = "Date",
+       y = "QTY_B2_19") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((validation_set$QTY_B2_19 - validation_set$predicted_qty)^2))
+
+# Print the RMSE
+cat("Root Mean Squared Error (RMSE):", rmse, "\n")
 ```
 
 **Discussion**
