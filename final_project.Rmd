@@ -13,6 +13,7 @@ library(ggseas)
 library(ggplot2)
 library(dplyr)
 library(forecast)
+library(lubridate)
 ```
 
 **Data Source**
@@ -761,6 +762,14 @@ ts_train_qty <- ts(training_set$QTY_B2_12, frequency = 365)
 # Fit an ARIMA model to training subset
 arima_model_qty <- auto.arima(ts_train_qty)
 
+# Plot Autocorrelation Function (ACF)
+acf(ts_train_qty, main = "ACF - QTY_B2_12")
+
+# Plot Partial Autocorrelation Function (PACF)
+pacf(ts_train_qty, main = "PACF - QTY_B2_12")
+```
+
+```{r}
 # Forecast on the validation data
 forecast_validation_qty <- forecast(arima_model_qty, h = length(validation_set))
 
@@ -800,6 +809,54 @@ cat("Training Set RMSE for PROMO_B2_12:", training_rmse_promo, "\n")
 validation_residuals_promo <- validation_set$PROMO_B2_12 - forecast_validation_promo$mean[1:length(validation_set)]
 validation_rmse_promo <- sqrt(mean(validation_residuals_promo^2))
 cat("Validation Set RMSE for PROMO_B2_12:", validation_rmse_promo, "\n")
+```
+
+### ARIMA (1, 1, 0) Configuration can 
+
+```{r}
+# Fit an ARIMA(1, 1, 0) model to training subset for QTY_B2_12
+arima_model_qty_110 <- arima(ts_train_qty, order = c(1, 1, 0))
+
+# Forecast on the validation data
+forecast_validation_qty_110 <- forecast(arima_model_qty_110, h = length(validation_set))
+
+# Display & plot forecast
+print(forecast_validation_qty_110)
+plot(forecast_validation_qty_110)
+
+# Evaluate model's training set performance
+training_residuals_qty_110 <- residuals(arima_model_qty_110)
+training_rmse_qty_110 <- sqrt(mean(training_residuals_qty_110^2))
+cat("Training Set RMSE for QTY_B2_12 (ARIMA(1, 1, 0)):", training_rmse_qty_110, "\n")
+
+# Evaluate model's validation set performance
+validation_residuals_qty_110 <- validation_set$QTY_B2_12 - forecast_validation_qty_110$mean[1:length(validation_set)]
+validation_rmse_qty_110 <- sqrt(mean(validation_residuals_qty_110^2))
+cat("Validation Set RMSE for QTY_B2_12 (ARIMA(1, 1, 0)):", validation_rmse_qty_110, "\n")
+```
+
+### ARIMA (1, 1, 1) Configuration  
+
+```{r}
+# Fit an ARIMA(1, 1, 1) model to training subset for QTY_B2_12
+arima_model_qty_111 <- arima(ts_train_qty, order = c(1, 1, 1))
+
+# Forecast on the validation data
+forecast_validation_qty_111 <- forecast(arima_model_qty_111, h = length(validation_set))
+
+# Display & plot forecast
+print(forecast_validation_qty_111)
+plot(forecast_validation_qty_111)
+
+# Evaluate model's training set performance
+training_residuals_qty_111 <- residuals(arima_model_qty_111)
+training_rmse_qty_111 <- sqrt(mean(training_residuals_qty_111^2))
+cat("Training Set RMSE for QTY_B2_12 (ARIMA(1, 1, 1)):", training_rmse_qty_111, "\n")
+
+# Evaluate model's validation set performance
+validation_residuals_qty_111 <- validation_set$QTY_B2_12 - forecast_validation_qty_111$mean[1:length(validation_set)]
+validation_rmse_qty_111 <- sqrt(mean(validation_residuals_qty_111^2))
+cat("Validation Set RMSE for QTY_B2_12 (ARIMA(1, 1, 1)):", validation_rmse_qty_111, "\n")
 ```
 
 ## Linear regression model for QTY_B2_12
@@ -1153,6 +1210,213 @@ rmse <- sqrt(mean((validation_set$QTY_B2_19 - validation_set$predicted_qty)^2))
 
 # Print the RMSE
 cat("Root Mean Squared Error (RMSE):", rmse, "\n")
+```
+
+## Created a NN model for product that yielded the highest increase in sales when promoted (3.2788210)
+
+```{r}
+# Assuming you have the neuralnet library installed, if not, install it using install.packages("neuralnet")
+library(neuralnet)
+library(ggplot2)
+
+# Convert variables to numeric
+training_set$DATE <- as.numeric(training_set$DATE)
+training_set$PROMO_B3_7 <- as.numeric(training_set$PROMO_B3_7)
+training_set$QTY_B3_7 <- as.numeric(training_set$QTY_B3_7)
+validation_set$DATE <- as.numeric(validation_set$DATE)
+validation_set$PROMO_B3_7 <- as.numeric(validation_set$PROMO_B3_7)
+validation_set$QTY_B3_7 <- as.numeric(validation_set$QTY_B3_7)
+
+# Build a neural network model
+neural_model <- neuralnet(QTY_B3_7 ~ DATE + PROMO_B3_7, data = training_set, hidden = c(5, 3))
+
+# Make predictions on the validation data
+validation_set$predicted_qty_neural <- predict(neural_model, newdata = validation_set)
+
+# Plot actual vs. predicted for the neural network
+ggplot(validation_set, aes(x = DATE, y = QTY_B3_7)) +
+  geom_line(aes(y = predicted_qty_neural), color = "red") +
+  labs(title = "Neural Network Model - Actual vs. Predicted QTY_B3_7",
+       x = "Date",
+       y = "QTY_B3_7") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE) for the neural network
+rmse_neural <- sqrt(mean((validation_set$QTY_B3_7 - validation_set$predicted_qty_neural)^2))
+
+# Print the RMSE for the neural network
+cat("Root Mean Squared Error (RMSE) for Neural Network:", rmse_neural, "\n")
+```
+# Developing new appraoch
+
+```{r}
+####GB####
+promo_b.ts <- ts(date_total_B[,c(7:7)], start = c(2014,1), end = c(2018,12), freq = 12)
+
+promo_b.ts
+```
+
+```{r}
+# Split the data into 'no_promo' (January 2014 to June 2017) and 'promo' (July 2017 to December 2018)
+no_promo <- subset(date_total_B, df.DATE >= as.Date("2014-01-01") & df.DATE <= as.Date("2017-06-30"))
+promo <- subset(date_total_B, df.DATE >= as.Date("2017-07-01") & df.DATE <= as.Date("2018-12-31"))
+```
+
+```{r}
+no_promo
+```
+
+# Updated code
+
+```{r}
+B1_sales <- df[, c(
+  "DATE", "QTY_B1_1", "QTY_B1_2", "QTY_B1_3", "QTY_B1_4", "QTY_B1_5", "QTY_B1_6", "QTY_B1_7", "QTY_B1_8", "QTY_B1_9", "QTY_B1_10", "QTY_B1_11", "QTY_B1_12", "QTY_B1_13", 
+  "QTY_B1_14", "QTY_B1_15", "QTY_B1_16", "QTY_B1_17", "QTY_B1_18", "QTY_B1_19", "QTY_B1_20", "QTY_B1_21", "QTY_B1_22", "QTY_B1_23", "QTY_B1_24", "QTY_B1_25", "QTY_B1_26", 
+  "QTY_B1_27", "QTY_B1_28", "QTY_B1_29", "QTY_B1_30", "QTY_B1_31", "QTY_B1_32", "QTY_B1_33", "QTY_B1_34", "QTY_B1_35", "QTY_B1_36", "QTY_B1_37", "QTY_B1_38", "QTY_B1_39", 
+  "QTY_B1_40", "QTY_B1_41", "QTY_B1_42", "PROMO_B1_1", "PROMO_B1_2", "PROMO_B1_3", "PROMO_B1_4", "PROMO_B1_5", "PROMO_B1_6", "PROMO_B1_7", "PROMO_B1_8", "PROMO_B1_9", 
+  "PROMO_B1_10", "PROMO_B1_11", "PROMO_B1_12", "PROMO_B1_13", "PROMO_B1_14", "PROMO_B1_15", "PROMO_B1_16", "PROMO_B1_17", "PROMO_B1_18", "PROMO_B1_19", "PROMO_B1_20", 
+  "PROMO_B1_21", "PROMO_B1_22", "PROMO_B1_23", "PROMO_B1_24", "PROMO_B1_25", "PROMO_B1_26", "PROMO_B1_27", "PROMO_B1_28", "PROMO_B1_29", "PROMO_B1_30", "PROMO_B1_31", 
+  "PROMO_B1_32", "PROMO_B1_33", "PROMO_B1_34", "PROMO_B1_35", "PROMO_B1_36", "PROMO_B1_37", "PROMO_B1_38", "PROMO_B1_39", "PROMO_B1_40", "PROMO_B1_41", "PROMO_B1_42"
+)]
+
+B2_sales <- df[, c(
+  "DATE", "QTY_B2_1", "QTY_B2_2", "QTY_B2_3", "QTY_B2_4", "QTY_B2_5", "QTY_B2_6", "QTY_B2_7", "QTY_B2_8", "QTY_B2_9", "QTY_B2_10", "QTY_B2_11", "QTY_B2_12", "QTY_B2_13", 
+  "QTY_B2_14", "QTY_B2_15", "QTY_B2_16", "QTY_B2_17", "QTY_B2_18", "QTY_B2_19", "QTY_B2_20", "QTY_B2_21", "QTY_B2_22", "QTY_B2_23", "QTY_B2_24", "QTY_B2_25", "QTY_B2_26", 
+  "QTY_B2_27", "QTY_B2_28", "QTY_B2_29", "QTY_B2_30", "QTY_B2_31", "QTY_B2_32", "QTY_B2_33", "QTY_B2_34", "QTY_B2_35", "QTY_B2_36", "QTY_B2_37", "QTY_B2_38", "QTY_B2_39", 
+  "QTY_B2_40", "QTY_B2_41", "QTY_B2_42", "QTY_B2_43", "QTY_B2_44", "QTY_B2_45", "PROMO_B2_1", "PROMO_B2_2", "PROMO_B2_3", "PROMO_B2_4", "PROMO_B2_5", "PROMO_B2_6", 
+  "PROMO_B2_7", "PROMO_B2_8", "PROMO_B2_9", "PROMO_B2_10", "PROMO_B2_11", "PROMO_B2_12", "PROMO_B2_13", "PROMO_B2_14", "PROMO_B2_15", "PROMO_B2_16", "PROMO_B2_17", 
+  "PROMO_B2_18", "PROMO_B2_19", "PROMO_B2_20", "PROMO_B2_21", "PROMO_B2_22", "PROMO_B2_23", "PROMO_B2_24", "PROMO_B2_25", "PROMO_B2_26", "PROMO_B2_27", "PROMO_B2_28", 
+  "PROMO_B2_29", "PROMO_B2_30", "PROMO_B2_31", "PROMO_B2_32", "PROMO_B2_33", "PROMO_B2_34", "PROMO_B2_35", "PROMO_B2_36", "PROMO_B2_37", "PROMO_B2_38", "PROMO_B2_39", 
+  "PROMO_B2_40", "PROMO_B2_41", "PROMO_B2_42", "PROMO_B2_43", "PROMO_B2_44", "PROMO_B2_45"
+)]
+
+B3_sales <- df[, c(
+  "DATE", "QTY_B3_1", "QTY_B3_2", "QTY_B3_3", "QTY_B3_4", "QTY_B3_5", "QTY_B3_6", "QTY_B3_7", "QTY_B3_8", "QTY_B3_9", "QTY_B3_10", "QTY_B3_11", "QTY_B3_12", "QTY_B3_13", 
+  "QTY_B3_14", "QTY_B3_15", "QTY_B3_16", "QTY_B3_17", "QTY_B3_18", "QTY_B3_19", "QTY_B3_20", "QTY_B3_21", "PROMO_B3_1", "PROMO_B3_2", "PROMO_B3_3", "PROMO_B3_4", 
+  "PROMO_B3_5", "PROMO_B3_6", "PROMO_B3_7", "PROMO_B3_8", "PROMO_B3_9", "PROMO_B3_10", "PROMO_B3_11", "PROMO_B3_12", "PROMO_B3_13", "PROMO_B3_14", "PROMO_B3_15", 
+  "PROMO_B3_16", "PROMO_B3_17", "PROMO_B3_18", "PROMO_B3_19", "PROMO_B3_20", "PROMO_B3_21"
+)]
+
+B4_sales <- df[, c(
+  "DATE", "QTY_B4_1", "QTY_B4_2", "QTY_B4_3", "QTY_B4_4", "QTY_B4_5", "QTY_B4_6", "QTY_B4_7", "QTY_B4_8", "QTY_B4_9", "QTY_B4_10", "PROMO_B4_1", "PROMO_B4_2", 
+  "PROMO_B4_3", "PROMO_B4_4", "PROMO_B4_5", "PROMO_B4_6", "PROMO_B4_7", "PROMO_B4_8", "PROMO_B4_9", "PROMO_B4_10"
+)]
+
+# Count the number of column names that start with "QTY_" for each data subset
+qty_columns_b1 <- sum(grepl("^QTY_", colnames(B1_sales)))
+qty_columns_b2 <- sum(grepl("^QTY_", colnames(B2_sales)))
+qty_columns_b3 <- sum(grepl("^QTY_", colnames(B3_sales)))
+qty_columns_b4 <- sum(grepl("^QTY_", colnames(B4_sales)))
+
+# Display the results
+cat("Number of columns starting with 'QTY_' in B1_sales:", qty_columns_b1, "\n")
+cat("Number of columns starting with 'QTY_' in B2_sales:", qty_columns_b2, "\n")
+cat("Number of columns starting with 'QTY_' in B3_sales:", qty_columns_b3, "\n")
+cat("Number of columns starting with 'QTY_' in B4_sales:", qty_columns_b4, "\n")
+```
+
+```{r}
+# Calculate the total sum for columns starting with "QTY_" in each data subset
+total_qty_b1 <- sum(B1_sales[, grepl("^QTY_", colnames(B1_sales))])
+total_qty_b2 <- sum(B2_sales[, grepl("^QTY_", colnames(B2_sales))])
+total_qty_b3 <- sum(B3_sales[, grepl("^QTY_", colnames(B3_sales))])
+total_qty_b4 <- sum(B4_sales[, grepl("^QTY_", colnames(B4_sales))])
+
+# Create a bar plot for comparison
+barplot(c(total_qty_b1, total_qty_b2, total_qty_b3, total_qty_b4),
+        names.arg = c("B1_sales", "B2_sales", "B3_sales", "B4_sales"),
+        col = "skyblue",
+        main = "Total Sum for Columns Starting with 'QTY_' in Each Subset",
+        xlab = "Data Subset",
+        ylab = "Total Sum")
+
+# Add values inside the bars
+text(c(1, 2, 3, 4), c(total_qty_b1, total_qty_b2, total_qty_b3, total_qty_b4),
+     labels = c(total_qty_b1, total_qty_b2, total_qty_b3, total_qty_b4),
+     pos = ifelse(c(total_qty_b1, total_qty_b2, total_qty_b3, total_qty_b4) < 10000, 3, 1),
+     col = "black", cex = 1.2)
+```
+
+```{r}
+# Calculate the total sum for columns starting with "PROMO_" in each data subset
+total_PROMO_b1 <- sum(B1_sales[, grepl("^PROMO_", colnames(B1_sales))])
+total_PROMO_b2 <- sum(B2_sales[, grepl("^PROMO_", colnames(B2_sales))])
+total_PROMO_b3 <- sum(B3_sales[, grepl("^PROMO_", colnames(B3_sales))])
+total_PROMO_b4 <- sum(B4_sales[, grepl("^PROMO_", colnames(B4_sales))])
+
+# Create a bar plot for comparison
+barplot(c(total_PROMO_b1, total_PROMO_b2, total_PROMO_b3, total_PROMO_b4),
+        names.arg = c("B1_sales", "B2_sales", "B3_sales", "B4_sales"),
+        col = "skyblue",
+        main = "Total Sum for Columns Starting with 'PROMO_' in Each Subset",
+        xlab = "Data Subset",
+        ylab = "Total Sum")
+
+# Add values inside the bars
+text(c(1, 2, 3, 4), c(total_PROMO_b1, total_PROMO_b2, total_PROMO_b3, total_PROMO_b4),
+     labels = c(total_PROMO_b1, total_PROMO_b2, total_PROMO_b3, total_PROMO_b4),
+     pos = ifelse(c(total_PROMO_b1, total_PROMO_b2, total_PROMO_b3, total_PROMO_b4) < 10000, 3, 1),
+     col = "black", cex = 1.2)
+```
+
+## Show the distribution of promotions
+
+```{r}
+# Filter columns starting w/ "PROMO_"
+promo_columns <- grep("^PROMO_", colnames(B1_sales), value = TRUE)
+
+# Calculate the sum for each column
+promo_sums <- colSums(B1_sales[promo_columns])
+
+# Display distribution table
+summary(promo_sums)
+```
+As we can see the median that will be used is 332
+
+```{r}
+# Calculate total column sums for "PROMO_" columns in B1_sales
+promo_totals <- colSums(B1_sales[, grepl("^PROMO_", colnames(B1_sales))])
+
+# Calculate the 50th percentile
+percentile_50 <- quantile(promo_totals, 0.5)
+
+# Divide into subsets based on the 50th percentile
+above_50_subset <- promo_totals[promo_totals > percentile_50]
+below_50_subset <- promo_totals[promo_totals <= percentile_50]
+```
+
+```{r}
+# Display the columns & total sum previously calculated
+above_50_subset
+```
+
+```{r}
+# Display the columns & total sum previously calculated
+below_50_subset
+```
+
+```{r}
+# Split into the two datasets
+B1_above <- df[, c("DATE", "QTY_B1_2",  "QTY_B1_3",  "QTY_B1_8",  "QTY_B1_9", "QTY_B1_11", "QTY_B1_12", "QTY_B1_13", "QTY_B1_14", "QTY_B1_20", "QTY_B1_22", "QTY_B1_23", "QTY_B1_24", "QTY_B1_28")]
+B1_below <- df[, c("DATE", "QTY_B1_1",  "QTY_B1_4",  "QTY_B1_5",  "QTY_B1_6",  "QTY_B1_7", "QTY_B1_10", "QTY_B1_15", "QTY_B1_16", "QTY_B1_17", "QTY_B1_18", "QTY_B1_19", "QTY_B1_21", "QTY_B1_25", "QTY_B1_26", "QTY_B1_27", "QTY_B1_33", "QTY_B1_34", "QTY_B1_35", "QTY_B1_36", "QTY_B1_40", "QTY_B1_41")]
+
+# Create new column combining the daily sums of each product
+B1_above$sum <- rowSums(B1_above[, grepl("^QTY_", colnames(B1_above))], na.rm = TRUE)
+B1_below$sum <- rowSums(B1_below[, grepl("^QTY_", colnames(B1_below))], na.rm = TRUE)
+
+# Create new dataset to apply to the predictive model
+B1_above <- B1_above[, c("DATE", "sum")]
+B1_below <- B1_below[, c("DATE", "sum")]
+```
+
+```{r}
+# Split the data into training (2014-01-02 to 2017-12-31) and validation (2018-01-31 to 2018-12-31)
+training_set <- subset(B1_above, DATE >= "2014-01-02" & DATE <= "2017-12-31")
+validation_set <- subset(B1_above, DATE >= "2018-01-31" & DATE <= "2018-12-31")
+
+# Display the dimensions of the training and validation sets
+cat("Training Set Dimensions:", dim(training_set), "\n")
+cat("Validation Set Dimensions:", dim(validation_set), "\n")
 ```
 
 **Discussion**
