@@ -14,6 +14,8 @@ library(ggplot2)
 library(dplyr)
 library(forecast)
 library(lubridate)
+library(neuralnet)
+library(ggplot2)
 ```
 
 **Data Source**
@@ -1316,26 +1318,42 @@ cat("Number of columns starting with 'QTY_' in B4_sales:", qty_columns_b4, "\n")
 ```
 
 ```{r}
+# Create a data frame
+data <- data.frame(
+  Category = c("Brand 1", "Brand 2", "Brand 3", "Brand 4"),
+  Count = c(qty_columns_b1, qty_columns_b2, qty_columns_b3, qty_columns_b4)
+)
+
+# Plot the bar chart
+ggplot(data, aes(x = Category, y = Count, fill = Category)) +
+  geom_bar(stat = "identity", color = "black", width = 0.7) +
+  labs(title = "Products Per Brand", x = "Brand", y = "Count") +
+  theme_minimal() +
+  geom_text(aes(label = Count), vjust = -0.5, color = "black", size = 4) 
+```
+
+```{r}
 # Calculate the total sum for columns starting with "QTY_" in each data subset
 total_qty_b1 <- sum(B1_sales[, grepl("^QTY_", colnames(B1_sales))])
 total_qty_b2 <- sum(B2_sales[, grepl("^QTY_", colnames(B2_sales))])
 total_qty_b3 <- sum(B3_sales[, grepl("^QTY_", colnames(B3_sales))])
 total_qty_b4 <- sum(B4_sales[, grepl("^QTY_", colnames(B4_sales))])
 
-# Create a bar plot for comparison
-barplot(c(total_qty_b1, total_qty_b2, total_qty_b3, total_qty_b4),
-        names.arg = c("B1_sales", "B2_sales", "B3_sales", "B4_sales"),
-        col = "skyblue",
-        main = "Total Sum for Columns Starting with 'QTY_' in Each Subset",
-        xlab = "Data Subset",
-        ylab = "Total Sum")
+# Create a data frame
+data <- data.frame(
+  Category = c("Brand 1", "Brand 2", "Brand 3", "Brand 4"),
+  Count = c(total_qty_b1, total_qty_b2, total_qty_b3, total_qty_b4)
+)
 
-# Add values inside the bars
-text(c(1, 2, 3, 4), c(total_qty_b1, total_qty_b2, total_qty_b3, total_qty_b4),
-     labels = c(total_qty_b1, total_qty_b2, total_qty_b3, total_qty_b4),
-     pos = ifelse(c(total_qty_b1, total_qty_b2, total_qty_b3, total_qty_b4) < 10000, 3, 1),
-     col = "black", cex = 1.2)
+# Plot the bar chart
+library(ggplot2)
+ggplot(data, aes(x = Category, y = Count, fill = Category)) +
+  geom_bar(stat = "identity", color = "black", width = 0.7) +
+  labs(title = "Total Sales for Each Brand", x = "Brand", y = "Sum") +
+  theme_minimal() +
+  geom_text(aes(label = Count), vjust = -0.5, color = "black", size = 4) 
 ```
+
 
 ```{r}
 # Calculate the total sum for columns starting with "PROMO_" in each data subset
@@ -1344,19 +1362,19 @@ total_PROMO_b2 <- sum(B2_sales[, grepl("^PROMO_", colnames(B2_sales))])
 total_PROMO_b3 <- sum(B3_sales[, grepl("^PROMO_", colnames(B3_sales))])
 total_PROMO_b4 <- sum(B4_sales[, grepl("^PROMO_", colnames(B4_sales))])
 
-# Create a bar plot for comparison
-barplot(c(total_PROMO_b1, total_PROMO_b2, total_PROMO_b3, total_PROMO_b4),
-        names.arg = c("B1_sales", "B2_sales", "B3_sales", "B4_sales"),
-        col = "skyblue",
-        main = "Total Sum for Columns Starting with 'PROMO_' in Each Subset",
-        xlab = "Data Subset",
-        ylab = "Total Sum")
+# Create a data frame
+data <- data.frame(
+  Category = c("Brand 1", "Brand 2", "Brand 3", "Brand 4"),
+  Count = c(total_PROMO_b1, total_PROMO_b2, total_PROMO_b3, total_PROMO_b4)
+)
 
-# Add values inside the bars
-text(c(1, 2, 3, 4), c(total_PROMO_b1, total_PROMO_b2, total_PROMO_b3, total_PROMO_b4),
-     labels = c(total_PROMO_b1, total_PROMO_b2, total_PROMO_b3, total_PROMO_b4),
-     pos = ifelse(c(total_PROMO_b1, total_PROMO_b2, total_PROMO_b3, total_PROMO_b4) < 10000, 3, 1),
-     col = "black", cex = 1.2)
+# Plot the bar chart
+library(ggplot2)
+ggplot(data, aes(x = Category, y = Count, fill = Category)) +
+  geom_bar(stat = "identity", color = "black", width = 0.7) +
+  labs(title = "Total Promotions for Each Brand", x = "Brand", y = "Sum") +
+  theme_minimal() +
+  geom_text(aes(label = Count), vjust = -0.5, color = "black", size = 4) 
 ```
 
 ## Show the distribution of promotions
@@ -1407,17 +1425,183 @@ B1_below$sum <- rowSums(B1_below[, grepl("^QTY_", colnames(B1_below))], na.rm = 
 # Create new dataset to apply to the predictive model
 B1_above <- B1_above[, c("DATE", "sum")]
 B1_below <- B1_below[, c("DATE", "sum")]
+
+# Convert to time series
+B1_above_ts <- ts(scale(B1_above$sum), start = min(B1_above$DATE), end = max(B1_above$DATE), frequency = 365)
+B1_below_ts <- ts(B1_below$sum, start = min(B1_below$DATE), end = max(B1_below$DATE), frequency = 365)
 ```
 
 ```{r}
-# Split the data into training (2014-01-02 to 2017-12-31) and validation (2018-01-31 to 2018-12-31)
-training_set <- subset(B1_above, DATE >= "2014-01-02" & DATE <= "2017-12-31")
-validation_set <- subset(B1_above, DATE >= "2018-01-31" & DATE <= "2018-12-31")
+# Specify date cutoffs
+train_start_date <- as.Date("2014-01-01")
+train_end_date <- as.Date("2017-12-31")
+test_start_date <- as.Date("2018-01-01")
+test_end_date <- as.Date("2018-12-31")
+
+# Split the dataset
+training_set <- subset(B1_above, DATE >= train_start_date & DATE <= train_end_date)
+validation_set <- subset(B1_above, DATE >= test_start_date & DATE <= test_end_date)
+
+# Calculate mean & std dev from the training set
+mean_training <- mean(training_set$sum)
+sd_training <- sd(training_set$sum)
+
+# Scale and center the sum columns
+training_set$sum_scaled <- scale(training_set$sum, center = mean_training, scale = sd_training)
+validation_set$sum_scaled <- scale(validation_set$sum, center = mean_training, scale = sd_training)
+
+# Turn into a time series format & scale the sum column for training set
+ts_training_set <- ts(scale(training_set$sum, center = mean_training, scale = sd_training),
+                      start = train_start_date, end = train_end_date, frequency = 365)
+
+# Scale the validation set using the mean and standard deviation from the training set
+ts_validation_set <- ts(scale(validation_set$sum, center = mean_training, scale = sd_training),
+                        start = test_start_date, end = test_end_date, frequency = 365)
 
 # Display the dimensions of the training and validation sets
 cat("Training Set Dimensions:", dim(training_set), "\n")
 cat("Validation Set Dimensions:", dim(validation_set), "\n")
 ```
+
+```{r}
+library(forecast)
+
+# Fit an ARIMA model
+arima_model <- auto.arima(ts_training_set)
+
+# Display the model summary
+summary(arima_model)
+
+# Make predictions on the validation set
+forecast_values <- forecast(arima_model, h = length(ts_validation_set))
+
+# Invert the scaling to get predictions in the original scale
+forecast_values <- forecast_values$mean * sd_training + mean_training
+
+# Plot the actual vs predicted values for the validation set
+plot(ts_validation_set, col = "blue", main = "ARIMA Model - Validation Set", ylab = "sum", xlab = "Date")
+lines(forecast_values, col = "red", lty = 2)
+legend("topleft", legend = c("Actual", "Predicted"), col = c("blue", "red"), lty = 1:2)
+```
+
+```{r}
+# Create a neural network model
+neural_model <- neuralnet(sum_scaled ~ DATE, data = training_set, hidden = c(5, 3), linear.output = TRUE)
+
+# Make predictions on the training set
+training_predictions <- predict(neural_model, training_set)
+
+# Make predictions on the validation set
+validation_predictions <- predict(neural_model, validation_set)
+
+# Include DATE in the prediction data frames
+df_training_predictions <- data.frame(DATE = training_set$DATE, sum_scaled = training_predictions)
+df_validation_predictions <- data.frame(DATE = validation_set$DATE, sum_scaled = validation_predictions)
+
+# Calculate RMSE for training set
+rmse_training <- sqrt(mean((training_set$sum_scaled - df_training_predictions$sum_scaled)^2))
+
+# Calculate RMSE for validation set
+rmse_validation <- sqrt(mean((validation_set$sum_scaled - df_validation_predictions$sum_scaled)^2))
+
+# Print RMSE values
+cat("RMSE for Training Set:", rmse_training, "\n")
+cat("RMSE for Validation Set:", rmse_validation, "\n")
+
+# Plot actual vs predicted for training set
+ggplot() +
+  geom_line(data = training_set, aes(x = DATE, y = sum_scaled), color = "blue", size = 1, linetype = "solid", alpha = 0.7) +
+  geom_line(data = df_training_predictions, aes(x = DATE, y = sum_scaled), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  labs(title = "Neural Network Model - Training Set", x = "Date", y = "sum") +
+  theme_minimal()
+
+# Plot actual vs predicted for validation set
+ggplot() +
+  geom_line(data = validation_set, aes(x = DATE, y = sum_scaled), color = "blue", size = 1, linetype = "solid", alpha = 0.7) +
+  geom_line(data = df_validation_predictions, aes(x = DATE, y = sum_scaled), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  labs(title = "Neural Network Model - Validation Set", x = "Date", y = "sum") +
+  theme_minimal()
+```
+
+```{r}
+# Convert the training_set and validation_set to time series
+ts_training_set <- ts(training_set$sum_scaled, start = train_start_date, end = train_end_date, frequency = 365)
+ts_validation_set <- ts(validation_set$sum_scaled, start = test_start_date, end = test_end_date, frequency = 365)
+
+# Create lagged values
+lagged_training_set <- embed(ts_training_set, 2)[, 2:1]
+colnames(lagged_training_set) <- c("lag1", "sum_scaled")
+
+lagged_validation_set <- embed(ts_validation_set, 2)[, 2:1]
+colnames(lagged_validation_set) <- c("lag1", "sum_scaled")
+
+# Create a neural network model
+neural_model <- neuralnet(sum_scaled ~ lag1, data = lagged_training_set, hidden = c(5, 3), linear.output = TRUE)
+
+# Make predictions on the training set
+training_predictions <- predict(neural_model, lagged_training_set)
+
+# Make predictions on the validation set
+validation_predictions <- predict(neural_model, lagged_validation_set)
+
+# Include DATE in the prediction data frames
+df_training_predictions <- data.frame(DATE = index(ts_training_set)[-1], sum_scaled = training_predictions)
+df_validation_predictions <- data.frame(DATE = index(ts_validation_set)[-1], sum_scaled = validation_predictions)
+
+# Calculate RMSE for training set
+rmse_training <- sqrt(mean((lagged_training_set$sum_scaled - df_training_predictions$sum_scaled)^2))
+
+# Calculate RMSE for validation set
+rmse_validation <- sqrt(mean((lagged_validation_set$sum_scaled - df_validation_predictions$sum_scaled)^2))
+
+# Print RMSE values
+cat("RMSE for Training Set:", rmse_training, "\n")
+cat("RMSE for Validation Set:", rmse_validation, "\n")
+
+# Plot actual vs predicted for training set
+ggplot() +
+  geom_line(data = lagged_training_set, aes(x = index(ts_training_set)[-1], y = sum_scaled), color = "blue", size = 1, linetype = "solid", alpha = 0.7) +
+  geom_line(data = df_training_predictions, aes(x = DATE, y = sum_scaled), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  labs(title = "Neural Network Model - Training Set", x = "Date", y = "sum") +
+  theme_minimal()
+
+# Plot actual vs predicted for validation set
+ggplot() +
+  geom_line(data = lagged_validation_set, aes(x = index(ts_validation_set)[-1], y = sum_scaled), color = "blue", size = 1, linetype = "solid", alpha = 0.7) +
+  geom_line(data = df_validation_predictions, aes(x = DATE, y = sum_scaled), color = "red", size = 1, linetype = "dashed", alpha = 0.7) +
+  labs(title = "Neural Network Model - Validation Set", x = "Date", y = "sum") +
+  theme_minimal()
+```
+
+```{r}
+# Convert variables to numeric
+training_set$DATE <- as.numeric(training_set$DATE)
+training_set$sum <- as.numeric(training_set$sum)
+validation_set$DATE <- as.numeric(validation_set$DATE)
+validation_set$sum <- as.numeric(validation_set$sum)
+
+# Build a neural network model
+neural_model <- neuralnet(sum ~ DATE, data = training_set, hidden = c(5, 3))
+
+# Make predictions on the validation data
+validation_set$predicted_qty_neural <- predict(neural_model, newdata = validation_set)
+
+# Plot actual vs. predicted for the neural network
+ggplot(validation_set, aes(x = DATE, y = sum)) +
+  geom_line(aes(y = predicted_qty_neural), color = "red") +
+  labs(title = "Neural Network Model - Actual vs. Predicted sum",
+       x = "Date",
+       y = "sum") +
+  theme_minimal()
+
+# Calculate Root Mean Squared Error (RMSE) for the neural network
+rmse_neural <- sqrt(mean((validation_set$sum - validation_set$predicted_qty_neural)^2))
+
+# Print the RMSE for the neural network
+cat("Root Mean Squared Error (RMSE) for Neural Network:", rmse_neural, "\n")
+```
+
+
 
 **Discussion**
 
