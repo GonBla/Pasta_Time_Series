@@ -1,0 +1,1056 @@
+---
+title: "ADS 506 Final Version 2"
+author: "Jesse Gutierrez"
+date: "2023-12-05"
+output: html_document
+---
+
+```{r}
+# Load required packages
+library(ggseas)
+library(ggplot2)
+library(dplyr)
+library(forecast)
+library(lubridate)
+library(neuralnet)
+library(ggplot2)
+```
+
+**Data Source**
+
+The dataset was found under the UCI publicly available repository with additional supporting data at Mendeley Data. The information presented was gathered from four national pasta brands and is compiled of 118 daily time series SKU-level sales of pasta from 01/01/2014 to 31/12/2018. The dataset has 1798 observations for 118 different types of pastas with 118 rows representing daily sales at normal price and 118 columns for the sales with a promotion.
+
+Besides univariate time series data, the quantity sold is integrated by information on the presence or the absence of a promotion.
+
+<https://archive.ics.uci.edu/dataset/611/hierarchical+sales+data> <https://data.mendeley.com/datasets/njdkntcpc9/1>
+
+**Importing the Data**
+
+As the dataset file was not available for download under the UCI repository, an available CSV file was downloaded from Data Mendeley. This file was saved to a corresponding folder within the researchers computer and then imported into R using the ensuing code.
+
+```{r}
+# Import the potential data set
+df <- read.csv('/Users/jesse/Downloads/Data for A machine learning approach for forecasting hierarchical time series/hierarchical_sales_data.csv')
+
+# Display the first few rows to see the format of the dates included
+head(df)
+```
+
+```{r}
+# Display the total range of the dates for all 118 observations
+start_date <- head(df$DATE, 1)
+end_date <- tail(df$DATE, 1)
+cat('The sales in this dataset range from ', start_date, 'to', end_date)
+```
+
+```{r}
+# Convert the date column to the correct format
+df$DATE <- as.Date(df$DATE)
+
+# Display the output for verification
+head(df)
+```
+
+```{r}
+# Calculate total sums for sales
+sales_sum <- df %>%
+  select(starts_with("QTY_B")) %>%
+  summarise(across(everything(), sum))
+
+# Calculate total sums for promotional sales
+promo_sum <- df %>%
+  select(starts_with("PROMO_B")) %>%
+  summarise(across(everything(), sum))
+
+# Create a data frame for the differences
+annual_differences <- data.frame(
+  Sales_Column = colnames(sales_sum),
+  Sales_Sum = unlist(sales_sum),
+  Promo_Sum = unlist(promo_sum),
+  Promo_Makeup = round(unlist(promo_sum)/(unlist(sales_sum) + unlist(promo_sum)) * 100, 2)
+)
+
+# Sort by Sales-Sum in desc. order
+annual_differences <- annual_differences %>%
+  arrange(desc(Sales_Sum))
+
+# Display the first 20 rows of the table
+head(annual_differences, 20)
+```
+
+```{r}
+# List the highest performing 10% of products
+top_performers <- head(annual_differences, 12)
+
+# Display the lowest performers
+top_performers
+```
+
+```{r}
+B1_sales <- df[, c(
+  "DATE", "QTY_B1_1", "QTY_B1_2", "QTY_B1_3", "QTY_B1_4", "QTY_B1_5", "QTY_B1_6", "QTY_B1_7", "QTY_B1_8", "QTY_B1_9", "QTY_B1_10", "QTY_B1_11", "QTY_B1_12", "QTY_B1_13", 
+  "QTY_B1_14", "QTY_B1_15", "QTY_B1_16", "QTY_B1_17", "QTY_B1_18", "QTY_B1_19", "QTY_B1_20", "QTY_B1_21", "QTY_B1_22", "QTY_B1_23", "QTY_B1_24", "QTY_B1_25", "QTY_B1_26", 
+  "QTY_B1_27", "QTY_B1_28", "QTY_B1_29", "QTY_B1_30", "QTY_B1_31", "QTY_B1_32", "QTY_B1_33", "QTY_B1_34", "QTY_B1_35", "QTY_B1_36", "QTY_B1_37", "QTY_B1_38", "QTY_B1_39", 
+  "QTY_B1_40", "QTY_B1_41", "QTY_B1_42", "PROMO_B1_1", "PROMO_B1_2", "PROMO_B1_3", "PROMO_B1_4", "PROMO_B1_5", "PROMO_B1_6", "PROMO_B1_7", "PROMO_B1_8", "PROMO_B1_9", 
+  "PROMO_B1_10", "PROMO_B1_11", "PROMO_B1_12", "PROMO_B1_13", "PROMO_B1_14", "PROMO_B1_15", "PROMO_B1_16", "PROMO_B1_17", "PROMO_B1_18", "PROMO_B1_19", "PROMO_B1_20", 
+  "PROMO_B1_21", "PROMO_B1_22", "PROMO_B1_23", "PROMO_B1_24", "PROMO_B1_25", "PROMO_B1_26", "PROMO_B1_27", "PROMO_B1_28", "PROMO_B1_29", "PROMO_B1_30", "PROMO_B1_31", 
+  "PROMO_B1_32", "PROMO_B1_33", "PROMO_B1_34", "PROMO_B1_35", "PROMO_B1_36", "PROMO_B1_37", "PROMO_B1_38", "PROMO_B1_39", "PROMO_B1_40", "PROMO_B1_41", "PROMO_B1_42"
+)]
+
+B2_sales <- df[, c(
+  "DATE", "QTY_B2_1", "QTY_B2_2", "QTY_B2_3", "QTY_B2_4", "QTY_B2_5", "QTY_B2_6", "QTY_B2_7", "QTY_B2_8", "QTY_B2_9", "QTY_B2_10", "QTY_B2_11", "QTY_B2_12", "QTY_B2_13", 
+  "QTY_B2_14", "QTY_B2_15", "QTY_B2_16", "QTY_B2_17", "QTY_B2_18", "QTY_B2_19", "QTY_B2_20", "QTY_B2_21", "QTY_B2_22", "QTY_B2_23", "QTY_B2_24", "QTY_B2_25", "QTY_B2_26", 
+  "QTY_B2_27", "QTY_B2_28", "QTY_B2_29", "QTY_B2_30", "QTY_B2_31", "QTY_B2_32", "QTY_B2_33", "QTY_B2_34", "QTY_B2_35", "QTY_B2_36", "QTY_B2_37", "QTY_B2_38", "QTY_B2_39", 
+  "QTY_B2_40", "QTY_B2_41", "QTY_B2_42", "QTY_B2_43", "QTY_B2_44", "QTY_B2_45", "PROMO_B2_1", "PROMO_B2_2", "PROMO_B2_3", "PROMO_B2_4", "PROMO_B2_5", "PROMO_B2_6", 
+  "PROMO_B2_7", "PROMO_B2_8", "PROMO_B2_9", "PROMO_B2_10", "PROMO_B2_11", "PROMO_B2_12", "PROMO_B2_13", "PROMO_B2_14", "PROMO_B2_15", "PROMO_B2_16", "PROMO_B2_17", 
+  "PROMO_B2_18", "PROMO_B2_19", "PROMO_B2_20", "PROMO_B2_21", "PROMO_B2_22", "PROMO_B2_23", "PROMO_B2_24", "PROMO_B2_25", "PROMO_B2_26", "PROMO_B2_27", "PROMO_B2_28", 
+  "PROMO_B2_29", "PROMO_B2_30", "PROMO_B2_31", "PROMO_B2_32", "PROMO_B2_33", "PROMO_B2_34", "PROMO_B2_35", "PROMO_B2_36", "PROMO_B2_37", "PROMO_B2_38", "PROMO_B2_39", 
+  "PROMO_B2_40", "PROMO_B2_41", "PROMO_B2_42", "PROMO_B2_43", "PROMO_B2_44", "PROMO_B2_45"
+)]
+
+B3_sales <- df[, c(
+  "DATE", "QTY_B3_1", "QTY_B3_2", "QTY_B3_3", "QTY_B3_4", "QTY_B3_5", "QTY_B3_6", "QTY_B3_7", "QTY_B3_8", "QTY_B3_9", "QTY_B3_10", "QTY_B3_11", "QTY_B3_12", "QTY_B3_13", 
+  "QTY_B3_14", "QTY_B3_15", "QTY_B3_16", "QTY_B3_17", "QTY_B3_18", "QTY_B3_19", "QTY_B3_20", "QTY_B3_21", "PROMO_B3_1", "PROMO_B3_2", "PROMO_B3_3", "PROMO_B3_4", 
+  "PROMO_B3_5", "PROMO_B3_6", "PROMO_B3_7", "PROMO_B3_8", "PROMO_B3_9", "PROMO_B3_10", "PROMO_B3_11", "PROMO_B3_12", "PROMO_B3_13", "PROMO_B3_14", "PROMO_B3_15", 
+  "PROMO_B3_16", "PROMO_B3_17", "PROMO_B3_18", "PROMO_B3_19", "PROMO_B3_20", "PROMO_B3_21"
+)]
+
+B4_sales <- df[, c(
+  "DATE", "QTY_B4_1", "QTY_B4_2", "QTY_B4_3", "QTY_B4_4", "QTY_B4_5", "QTY_B4_6", "QTY_B4_7", "QTY_B4_8", "QTY_B4_9", "QTY_B4_10", "PROMO_B4_1", "PROMO_B4_2", 
+  "PROMO_B4_3", "PROMO_B4_4", "PROMO_B4_5", "PROMO_B4_6", "PROMO_B4_7", "PROMO_B4_8", "PROMO_B4_9", "PROMO_B4_10"
+)]
+
+# Count the number of column names that start with "QTY_" for each data subset
+qty_columns_b1 <- sum(grepl("^QTY_", colnames(B1_sales)))
+qty_columns_b2 <- sum(grepl("^QTY_", colnames(B2_sales)))
+qty_columns_b3 <- sum(grepl("^QTY_", colnames(B3_sales)))
+qty_columns_b4 <- sum(grepl("^QTY_", colnames(B4_sales)))
+
+# Display the results
+cat("Number of columns starting with 'QTY_' in B1_sales:", qty_columns_b1, "\n")
+cat("Number of columns starting with 'QTY_' in B2_sales:", qty_columns_b2, "\n")
+cat("Number of columns starting with 'QTY_' in B3_sales:", qty_columns_b3, "\n")
+cat("Number of columns starting with 'QTY_' in B4_sales:", qty_columns_b4, "\n")
+```
+
+```{r}
+# Create a data frame
+data <- data.frame(
+  Category = c("Brand 1", "Brand 2", "Brand 3", "Brand 4"),
+  Count = c(qty_columns_b1, qty_columns_b2, qty_columns_b3, qty_columns_b4)
+)
+
+# Plot the bar chart
+ggplot(data, aes(x = Category, y = Count, fill = Category)) +
+  geom_bar(stat = "identity", color = "black", width = 0.7) +
+  labs(title = "Products Per Brand", x = "Brand", y = "Count") +
+  theme_minimal() +
+  geom_text(aes(label = Count), vjust = -0.5, color = "black", size = 4) 
+```
+
+```{r}
+# Calculate the total sum for columns starting with "QTY_" in each data subset
+total_qty_b1 <- sum(B1_sales[, grepl("^QTY_", colnames(B1_sales))])
+total_qty_b2 <- sum(B2_sales[, grepl("^QTY_", colnames(B2_sales))])
+total_qty_b3 <- sum(B3_sales[, grepl("^QTY_", colnames(B3_sales))])
+total_qty_b4 <- sum(B4_sales[, grepl("^QTY_", colnames(B4_sales))])
+
+# Create a data frame
+data <- data.frame(
+  Category = c("Brand 1", "Brand 2", "Brand 3", "Brand 4"),
+  Count = c(total_qty_b1, total_qty_b2, total_qty_b3, total_qty_b4)
+)
+
+# Plot the bar chart
+ggplot(data, aes(x = Category, y = Count, fill = Category)) +
+  geom_bar(stat = "identity", color = "black", width = 0.7) +
+  labs(title = "Total Sales for Each Brand", x = "Brand", y = "Sum") +
+  theme_minimal() +
+  geom_text(aes(label = Count), vjust = -0.5, color = "black", size = 4) 
+```
+
+```{r}
+# Calculate the total sum for columns starting with "PROMO_" in each data subset
+total_PROMO_b1 <- sum(B1_sales[, grepl("^PROMO_", colnames(B1_sales))])
+total_PROMO_b2 <- sum(B2_sales[, grepl("^PROMO_", colnames(B2_sales))])
+total_PROMO_b3 <- sum(B3_sales[, grepl("^PROMO_", colnames(B3_sales))])
+total_PROMO_b4 <- sum(B4_sales[, grepl("^PROMO_", colnames(B4_sales))])
+
+# Create a data frame
+data <- data.frame(
+  Category = c("Brand 1", "Brand 2", "Brand 3", "Brand 4"),
+  Count = c(total_PROMO_b1, total_PROMO_b2, total_PROMO_b3, total_PROMO_b4)
+)
+
+# Plot the bar chart
+ggplot(data, aes(x = Category, y = Count, fill = Category)) +
+  geom_bar(stat = "identity", color = "black", width = 0.7) +
+  labs(title = "Total Promotions for Each Brand", x = "Brand", y = "Sum") +
+  theme_minimal() +
+  geom_text(aes(label = Count), vjust = -0.5, color = "black", size = 4) 
+```
+
+## Show the distribution of promotions
+
+```{r}
+# Filter columns starting w/ "PROMO_"
+promo_columns <- grep("^PROMO_", colnames(B1_sales), value = TRUE)
+
+# Calculate the sum for each column
+promo_sums <- colSums(B1_sales[promo_columns])
+
+# Display distribution table
+summary(promo_sums)
+```
+As we can see the median that will be used is 332
+
+```{r}
+# Calculate total column sums for "PROMO_" columns in B1_sales
+promo_totals <- colSums(B1_sales[, grepl("^PROMO_", colnames(B1_sales))])
+
+# Calculate the 50th percentile
+percentile_50 <- quantile(promo_totals, 0.5)
+
+# Divide into subsets based on the 50th percentile
+above_50_subset <- promo_totals[promo_totals > percentile_50]
+below_50_subset <- promo_totals[promo_totals <= percentile_50]
+```
+
+
+```{r}
+# Display the columns & total sum previously calculated
+above_50_subset
+```
+
+```{r}
+# Display the columns & total sum previously calculated
+below_50_subset
+```
+
+```{r}
+# Split into the two datasets
+B1_above <- df[, c("DATE", "QTY_B1_2",  "QTY_B1_3",  "QTY_B1_8",  "QTY_B1_9", "QTY_B1_11", "QTY_B1_12", "QTY_B1_13", "QTY_B1_14", "QTY_B1_20", "QTY_B1_22", "QTY_B1_23", "QTY_B1_24", "QTY_B1_28")]
+B1_below <- df[, c("DATE", "QTY_B1_1",  "QTY_B1_4",  "QTY_B1_5",  "QTY_B1_6",  "QTY_B1_7", "QTY_B1_10", "QTY_B1_15", "QTY_B1_16", "QTY_B1_17", "QTY_B1_18", "QTY_B1_19", "QTY_B1_21", "QTY_B1_25", "QTY_B1_26", "QTY_B1_27", "QTY_B1_33", "QTY_B1_34", "QTY_B1_35", "QTY_B1_36", "QTY_B1_40", "QTY_B1_41")]
+
+# Create new column combining the daily sums of each product
+B1_above$sum <- rowSums(B1_above[, grepl("^QTY_", colnames(B1_above))], na.rm = TRUE)
+B1_below$sum <- rowSums(B1_below[, grepl("^QTY_", colnames(B1_below))], na.rm = TRUE)
+
+# Create new dataset to apply to the predictive model
+B1_above <- B1_above[, c("DATE", "sum")]
+B1_below <- B1_below[, c("DATE", "sum")]
+
+# Convert to time series
+B1_above_ts <- ts(scale(B1_above$sum), start = min(B1_above$DATE), end = max(B1_above$DATE), frequency = 365)
+B1_below_ts <- ts(B1_below$sum, start = min(B1_below$DATE), end = max(B1_below$DATE), frequency = 365)
+```
+
+
+
+```{r}
+# Specify date cutoffs
+train_start_date <- as.Date("2014-01-01")
+train_end_date <- as.Date("2017-12-31")
+test_start_date <- as.Date("2018-01-01")
+test_end_date <- as.Date("2018-12-31")
+
+# Split the dataset
+training_set <- subset(B1_above, DATE >= train_start_date & DATE <= train_end_date)
+validation_set <- subset(B1_above, DATE >= test_start_date & DATE <= test_end_date)
+
+# Calculate mean & std dev from the training set
+mean_training <- mean(training_set$sum)
+sd_training <- sd(training_set$sum)
+
+# Scale and center the sum columns 
+training_set$sum <- scale(training_set$sum, center = mean_training, scale = sd_training) 
+validation_set$sum <- scale(validation_set$sum, center = mean_training, scale = sd_training) 
+```
+
+```{r}
+# Turn into a time series format 
+ts_training_set <- ts(training_set$sum, frequency = 361) # 1443 rows/4 years = 361
+ts_validation_set <- ts(validation_set$sum, frequency = 355) # Only has 355 values
+
+# Turn into a time series format 
+# ts_training_set <- ts(training_set$sum, start = train_start_date, end = train_end_date, frequency = 361) # 1443 rows/4 years = 361
+# ts_validation_set <- ts(validation_set$sum, start = test_start_date, end = test_end_date, frequency = 355) # Only has 355 values
+
+# Display the dimensions of the training and validation sets
+cat("Training Set Dimensions:", dim(training_set), "\n")
+cat("Validation Set Dimensions:", dim(validation_set), "\n")
+```
+
+**Building Time Series Models**
+
+#### First test for ACF & PCF
+
+
+```{r}
+# Plot Autocorrelation Function (ACF)
+acf(ts_training_set, main = "ACF - B1 Above")
+
+# Plot Partial Autocorrelation Function (PACF)
+pacf(ts_training_set, main = "PACF - B1 Above")
+```
+I chose to use the auto.arima() so that the model can determine the optimal (p, d, q) and then verify the decision w/ the ACF. & PACF plots.
+
+```{r}
+# Fit an ARIMA model to training subset
+arima_model_B1_above <- auto.arima(ts_training_set)
+
+# Print model summary
+summary(arima_model_B1_above) 
+
+# Extract residuals from the model
+residuals <- residuals(arima_model_B1_above)
+
+# Plot Autocorrelation Function (ACF) of residuals
+acf(residuals, main = "ACF - Residuals")
+
+# Plot Partial Autocorrelation Function (PACF) of residuals
+pacf(residuals, main = "PACF - Residuals")
+```
+The best performing ARIMA was (4, 0, 0)
+Trying to verify the (p, q, d) values
+
+```{r}
+# Generate forecasts using the ARIMA model
+forecast_values <- forecast(arima_model_B1_above, h = length(ts_training_set))
+
+# Create a data frame with actual vs predicted vs difference values
+results_df <- data.frame(
+  Date = training_set$DATE,
+  Actual = ts_training_set,
+  Predicted = forecast_values$mean
+)
+
+# Unscale and uncenter
+unscaled_series1 <- ts_training_set * sd_training + mean_training
+unscaled_predicted <- forecast_values$mean * sd_training + mean_training
+
+
+# Create a data frame with actual vs predicted vs difference values
+results_df <- data.frame(
+  Date = time(ts_training_set),
+  Actual = unscaled_series1,
+  Predicted = unscaled_predicted
+)
+
+# Display the results
+results_df
+```
+Saving the predicted vs actual values in a dataframe to do a comparative plot
+
+```{r}
+min <- min(results_df$Series.1)
+max <- max(results_df$Series.1)
+median <- median(results_df$Series.1)
+mean <- mean(results_df$Series.1)
+
+cat("Training Set", "\n")
+cat("Minimum:", min, '\n')
+cat("Maximum:", max, '\n')
+cat("Median:", median, '\n')
+cat("Mean:", mean, '\n')
+```
+
+```{r}
+min <- min(results_df$Predicted)
+max <- max(results_df$Predicted)
+median <- median(results_df$Predicted)
+mean <- mean(results_df$Predicted)
+
+cat("Training Set", "\n")
+cat("Minimum:", min, '\n')
+cat("Maximum:", max, '\n')
+cat("Median:", median, '\n')
+cat("Mean:", mean, '\n')
+```
+
+```{r}
+# Plot above results
+ggplot(results_df, aes(x = Date)) +
+  geom_line(aes(y = Series.1, color = "Actual"), linewidth = 1) +
+  geom_line(aes(y = Predicted, color = "Predicted"), linewidth = 1) +
+  labs(title = "Actual vs Predicted Time Series",
+       x = "Date",
+       y = "Value") +
+  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red")) +
+  theme_minimal()
+```
+
+```{r}
+# Apply ARIMA model to the validation set
+forecast_values_validation <- forecast(arima_model_B1_above, h = length(ts_validation_set))
+
+# Unscale and uncenter
+unscaled_series2 <- ts_validation_set * sd_training + mean_training
+unscaled_predicted1 <- forecast_values_validation$mean * sd_training + mean_training
+
+# Create a data frame w/ actual vs predicted values
+results_validation_df <- data.frame(
+  Date = validation_set$DATE,
+  Actual = unscaled_series2,
+  Predicted = unscaled_predicted1
+)
+
+# Output the model's summary
+summary(arima_model_B1_above)
+
+# Display comparative table
+results_validation_df
+```
+Apply model to the validation set to test for the accuracy & overfitting concerns
+
+```{r}
+min <- min(results_validation_df$Series.1)
+max <- max(results_validation_df$Series.1)
+median <- median(results_validation_df$Series.1)
+mean <- mean(results_validation_df$Series.1)
+
+cat("Minimum:", min, '\n')
+cat("Maximum:", max, '\n')
+cat("Median:", median, '\n')
+cat("Mean:", mean, '\n')
+```
+
+```{r}
+min <- min(results_validation_df$Predicted)
+max <- max(results_validation_df$Predicted)
+median <- median(results_validation_df$Predicted)
+mean <- mean(results_validation_df$Predicted)
+
+cat("Minimum:", min, '\n')
+cat("Maximum:", max, '\n')
+cat("Median:", median, '\n')
+cat("Mean:", mean, '\n')
+```
+
+```{r}
+# Apply ARIMA model to the B1_below_ts set
+forecast_values_validation <- forecast(arima_model_B1_above, h = length(B1_below_ts))
+
+# Reverse the scaling and centering for the predicted values
+predicted_scaled <- forecast_values_validation$mean
+predicted_original <- predicted_scaled * sd_training + mean_training
+
+# Create a data frame w/ actual vs predicted values
+results_B1_below_df <- data.frame(
+  Actual = B1_below_ts,
+  Predicted = predicted_original
+)
+
+# Print summary of the model
+summary(forecast_values_validation)
+
+# Display comparative table
+results_B1_below_df
+```
+Now apply the model to the B1_below_ts dataset
+
+# Now try to build a ARIMA model w/o scaling or centering the data
+
+```{r}
+# Specify date cutoffs
+train_start_date <- as.Date("2014-01-01")
+train_end_date <- as.Date("2017-12-31")
+test_start_date <- as.Date("2018-01-01")
+test_end_date <- as.Date("2018-12-31")
+
+# Split the dataset
+training_set <- subset(B1_above, DATE >= train_start_date & DATE <= train_end_date)
+validation_set <- subset(B1_above, DATE >= test_start_date & DATE <= test_end_date)
+
+# Turn into a time series format 
+ts_training_set <- ts(training_set$sum, frequency = 361) # 1443 rows/4 years = 361
+ts_validation_set <- ts(validation_set$sum, frequency = 355) # Only has 355 values
+
+# Fit an ARIMA model to training subset
+unscaled_arima_model_B1_above <- auto.arima(ts_training_set)
+
+# Print model summary
+summary(unscaled_arima_model_B1_above) 
+
+# Extract residuals from the model
+residuals <- residuals(unscaled_arima_model_B1_above)
+
+# Plot Autocorrelation Function (ACF) of residuals
+acf(residuals, main = "ACF - Residuals")
+
+# Plot Partial Autocorrelation Function (PACF) of residuals
+pacf(residuals, main = "PACF - Residuals")
+```
+
+```{r}
+min <- min(B1_above$sum)
+max <- max(B1_above$sum)
+median <- median(B1_above$sum)
+mean <- mean(B1_above$sum)
+
+min
+max
+median
+mean
+```
+
+```{r}
+# Generate forecasts using the ARIMA model
+forecast_values <- forecast(unscaled_arima_model_B1_above, h = length(ts_training_set))
+
+# Create a data frame with actual vs predicted vs difference values
+results_df <- data.frame(
+  Date = training_set$DATE,
+  Actual = ts_training_set,
+  Predicted = forecast_values$mean
+)
+
+# Unscale and uncenter
+unscaled_series1 <- ts_training_set * sd_training + mean_training
+unscaled_predicted <- forecast_values$mean * sd_training + mean_training
+
+
+# Create a data frame with actual vs predicted vs difference values
+results_df <- data.frame(
+  Date = time(ts_training_set),
+  Actual = unscaled_series1,
+  Predicted = unscaled_predicted
+)
+
+# Display the results
+results_df
+```
+
+
+```{r}
+min <- min(results_df$Predicted)
+max <- max(results_df$Predicted)
+median <- median(results_df$Predicted)
+mean <- mean(results_df$Predicted)
+
+cat("Training Set", "\n")
+cat("Minimum:", min, '\n')
+cat("Maximum:", max, '\n')
+cat("Median:", median, '\n')
+cat("Mean:", mean, '\n')
+```
+
+```{r}
+# Plot above results
+ggplot(results_df, aes(x = Date)) +
+  geom_line(aes(y = Actual, color = "Actual"), linewidth = 1) +
+  geom_line(aes(y = Predicted, color = "Predicted"), linewidth = 1) +
+  labs(title = "Actual vs Predicted Time Series",
+       x = "Date",
+       y = "Value") +
+  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red")) +
+  theme_minimal()
+```
+
+```{r}
+# Apply ARIMA model to the validation set
+forecast_values_validation <- forecast(unscaled_arima_model_B1_above, h = length(ts_validation_set))
+
+# Unscale and uncenter
+unscaled_series2 <- ts_validation_set * sd_training + mean_training
+unscaled_predicted1 <- forecast_values_validation$mean * sd_training + mean_training
+
+# Create a data frame w/ actual vs predicted values
+results_validation_df <- data.frame(
+  Date = validation_set$DATE,
+  Actual = unscaled_series2,
+  Predicted = unscaled_predicted1
+)
+
+# Output the model's summary
+summary(unscaled_arima_model_B1_above)
+
+# Display comparative table
+results_validation_df
+```
+Apply model to the validation set to test for the accuracy & overfitting concerns
+
+```{r}
+min <- min(results_validation_df$Predicted)
+max <- max(results_validation_df$Predicted)
+median <- median(results_validation_df$Predicted)
+mean <- mean(results_validation_df$Predicted)
+
+cat("Minimum:", min, '\n')
+cat("Maximum:", max, '\n')
+cat("Median:", median, '\n')
+cat("Mean:", mean, '\n')
+```
+
+```{r}
+# Apply ARIMA model to the B1_below_ts set
+forecast_values_validation <- forecast(unscaled_arima_model_B1_above, h = length(B1_below_ts))
+
+# Create a data frame w/ actual vs predicted values
+results_B1_below_df <- data.frame(
+  Actual = forecast_values_validation$mean,
+  Predicted = predicted_original
+)
+
+# Print summary of the model
+summary(forecast_values_validation)
+
+# Display comparative table
+results_B1_below_df
+```
+# Split B1 above data
+
+```{r}
+# Specify date cutoffs
+train_start_date <- as.Date("2014-01-01")
+train_end_date <- as.Date("2017-12-31")
+test_start_date <- as.Date("2018-01-01")
+test_end_date <- as.Date("2018-12-31")
+
+# Split the dataset
+training_set <- subset(B1_above, DATE >= train_start_date & DATE <= train_end_date)
+validation_set <- subset(B1_above, DATE >= test_start_date & DATE <= test_end_date)
+
+# Calculate mean & std dev from the training set
+mean_training <- mean(training_set$sum)
+sd_training <- sd(training_set$sum)
+
+# Scale and center the sum columns 
+training_set$sum <- scale(training_set$sum, center = mean_training, scale = sd_training) 
+validation_set$sum <- scale(validation_set$sum, center = mean_training, scale = sd_training) 
+
+# Turn into a time series format 
+ts_training_set <- ts(training_set$sum, frequency = 361) # 1443 rows/4 years = 361
+ts_validation_set <- ts(validation_set$sum, frequency = 355) # Only has 355 values
+
+# Turn into a time series format 
+# ts_training_set <- ts(training_set$sum, start = train_start_date, end = train_end_date, frequency = 361) # 1443 rows/4 years = 361
+# ts_validation_set <- ts(validation_set$sum, start = test_start_date, end = test_end_date, frequency = 355) # Only has 355 values
+
+# Display the dimensions of the training and validation sets
+cat("Training Set Dimensions:", dim(training_set), "\n")
+cat("Validation Set Dimensions:", dim(validation_set), "\n")
+```
+
+# Build a Neural Network Model on B1 Above Data
+
+```{r}
+# Fit a neural network model to training subset
+nn_model_B1_above <- nnetar(ts_training_set)
+
+# Print model summary
+summary(nn_model_B1_above)
+```
+Build NN model & display summary of output
+
+```{r}
+# Apply model on the training set
+forecast_values_nn_train <- forecast(nn_model_B1_above, h = length(ts_training_set))
+
+# Extract predicted values
+predicted_values_train <- forecast_values_nn_train$mean
+
+# Convert prediction into a ts object
+predicted_values_ts_train <- ts(predicted_values_train, frequency = frequency(ts_training_set))
+
+# Calculate accuracy
+accuracy_metrics_train <- accuracy(predicted_values_ts_train, ts_training_set)
+
+# Display accuracy metrics for the training set
+accuracy_metrics_train
+```
+
+```{r}
+# Extract values
+actual_values <- as.vector(ts_training_set)
+
+# Create a data frame with actual and predicted values
+results_df <- data.frame(
+  Date = training_set$DATE,
+  Actual = actual_values,
+  Predicted = predicted_values_ts_train
+)
+
+# Display the data frame
+results_df
+
+# Plot above results
+ggplot(results_df, aes(x = Date)) +
+  geom_line(aes(y = Actual, color = "Actual"), linewidth = 1) +
+  geom_line(aes(y = Predicted, color = "Predicted"), linewidth = 1) +
+  labs(title = "Scaled Training Set- Actual vs Predicted Time Series",
+       x = "Date",
+       y = "Value") +
+  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red")) +
+  theme_minimal()
+```
+
+```{r}
+# Generate forecasts using the neural network model
+forecast_values_nn <- forecast(nn_model_B1_above, h = length(ts_validation_set))
+
+# Extract the predicted values
+predicted_values <- forecast_values_nn$mean
+
+# Convert predicted_values to a time series object with the same frequency as ts_validation_set
+predicted_values_ts <- ts(predicted_values, frequency = frequency(ts_validation_set))
+
+# Calculate accuracy metrics
+accuracy_metrics <- accuracy(predicted_values_ts, ts_validation_set)
+
+# Display accuracy metrics
+accuracy_metrics
+```
+
+```{r}
+# Extract values
+actual_values <- as.vector(ts_validation_set)
+
+# Create a data frame with actual and predicted values
+results_df <- data.frame(
+  Date = validation_set$DATE,
+  Actual = actual_values,
+  Predicted = predicted_values
+)
+
+# Display the data frame
+results_df
+
+# Plot above results
+ggplot(results_df, aes(x = Date)) +
+  geom_line(aes(y = Actual, color = "Actual"), linewidth = 1) +
+  geom_line(aes(y = Predicted, color = "Predicted"), linewidth = 1) +
+  labs(title = "Scaled Validation Set- Actual vs Predicted Time Series",
+       x = "Date",
+       y = "Value") +
+  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red")) +
+  theme_minimal()
+```
+
+# Split B1 above data
+
+```{r}
+# Specify date cutoffs
+train_start_date <- as.Date("2014-01-01")
+train_end_date <- as.Date("2017-12-31")
+test_start_date <- as.Date("2018-01-01")
+test_end_date <- as.Date("2018-12-31")
+
+# Split the dataset
+training_set <- subset(B1_below, DATE >= train_start_date & DATE <= train_end_date)
+validation_set <- subset(B1_below, DATE >= test_start_date & DATE <= test_end_date)
+
+# Calculate mean & std dev from the training set
+mean_training <- mean(training_set$sum)
+sd_training <- sd(training_set$sum)
+
+# Scale and center the sum columns 
+training_set$sum <- scale(training_set$sum, center = mean_training, scale = sd_training) 
+validation_set$sum <- scale(validation_set$sum, center = mean_training, scale = sd_training) 
+
+# Turn into a time series format 
+ts_training_set <- ts(training_set$sum, frequency = 361) # 1443 rows/4 years = 361
+ts_validation_set <- ts(validation_set$sum, frequency = 355) # Only has 355 values
+
+# Turn into a time series format 
+# ts_training_set <- ts(training_set$sum, start = train_start_date, end = train_end_date, frequency = 361) # 1443 rows/4 years = 361
+# ts_validation_set <- ts(validation_set$sum, start = test_start_date, end = test_end_date, frequency = 355) # Only has 355 values
+
+# Display the dimensions of the training and validation sets
+cat("Training Set Dimensions:", dim(training_set), "\n")
+cat("Validation Set Dimensions:", dim(validation_set), "\n")
+```
+
+# Build a Neural Network Model on B1 Below Data
+
+```{r}
+# Fit a neural network model to training subset
+nn_model_B1_below <- nnetar(ts_training_set)
+
+# Print model summary
+summary(nn_model_B1_below)
+```
+Build NN model & display summary of output
+
+```{r}
+# Apply model on the training set
+forecast_values_nn_train <- forecast(nn_model_B1_below, h = length(ts_training_set))
+
+# Extract predicted values
+predicted_values_train <- forecast_values_nn_train$mean
+
+# Convert prediction into a ts object
+predicted_values_ts_train <- ts(predicted_values_train, frequency = frequency(ts_training_set))
+
+# Calculate accuracy
+accuracy_metrics_train <- accuracy(predicted_values_ts_train, ts_training_set)
+
+# Display accuracy metrics for the training set
+accuracy_metrics_train
+```
+
+```{r}
+# Extract values
+actual_values <- as.vector(ts_training_set)
+
+# Create a data frame with actual and predicted values
+results_df <- data.frame(
+  Date = training_set$DATE,
+  Actual = actual_values,
+  Predicted = predicted_values_ts_train
+)
+
+# Display the data frame
+results_df
+
+# Plot above results
+ggplot(results_df, aes(x = Date)) +
+  geom_line(aes(y = Actual, color = "Actual"), linewidth = 1) +
+  geom_line(aes(y = Predicted, color = "Predicted"), linewidth = 1) +
+  labs(title = "Scaled Training Set- Actual vs Predicted Time Series",
+       x = "Date",
+       y = "Value") +
+  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red")) +
+  theme_minimal()
+```
+
+```{r}
+# Generate forecasts using the neural network model
+forecast_values_nn <- forecast(nn_model_B1_below, h = length(ts_validation_set))
+
+# Extract the predicted values
+predicted_values <- forecast_values_nn$mean
+
+# Convert predicted_values to a time series object with the same frequency as ts_validation_set
+predicted_values_ts <- ts(predicted_values, frequency = frequency(ts_validation_set))
+
+# Calculate accuracy metrics
+accuracy_metrics <- accuracy(predicted_values_ts, ts_validation_set)
+
+# Display accuracy metrics
+accuracy_metrics
+```
+
+```{r}
+# Extract values
+actual_values <- as.vector(ts_validation_set)
+
+# Create a data frame with actual and predicted values
+results_df <- data.frame(
+  Date = validation_set$DATE,
+  Actual = actual_values,
+  Predicted = predicted_values
+)
+
+# Display the data frame
+results_df
+
+# Plot above results
+ggplot(results_df, aes(x = Date)) +
+  geom_line(aes(y = Actual, color = "Actual"), linewidth = 1) +
+  geom_line(aes(y = Predicted, color = "Predicted"), linewidth = 1) +
+  labs(title = "Scaled Validation Set- Actual vs Predicted Time Series",
+       x = "Date",
+       y = "Value") +
+  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red")) +
+  theme_minimal()
+```
+
+# Predict difference in sales
+
+```{r}
+# Turn full duration into time series format 
+B1_above_ts_entire <- ts(B1_above$sum, frequency = 360) # 1798 rows/5 years = 360
+B1_below_ts_entire <- ts(B1_below$sum, frequency = 360) # 1798 rows/5 years = 360
+```
+
+```{r}
+# Fit neural network model on entire set
+nn_model_full_B1_above <- nnetar(B1_above_ts_entire)
+nn_model_full_B1_below <- nnetar(B1_below_ts_entire)
+
+# Print model summary
+print("B1 Above")
+summary(nn_model_full_B1_above)
+print("B1 Below")
+summary(nn_model_full_B1_below)
+```
+
+```{r}
+# Apply model
+forecast_values_nn_above <- forecast(nn_model_full_B1_above, h = length(B1_above_ts_entire))
+forecast_values_nn_below <- forecast(nn_model_full_B1_below, h = length(B1_below_ts_entire))
+
+# Extract predicted values
+predicted_values_above <- forecast_values_nn_above$mean
+predicted_values_below <- forecast_values_nn_below$mean
+
+# Convert prediction into a ts object
+predicted_values_ts_above <- ts(predicted_values_above, frequency = frequency(B1_above_ts_entire))
+predicted_values_ts_below <- ts(predicted_values_below, frequency = frequency(B1_below_ts_entire))
+
+# Calculate accuracy
+accuracy_metrics_above <- accuracy(predicted_values_ts_above, B1_above_ts_entire)
+accuracy_metrics_below <- accuracy(predicted_values_ts_below, B1_below_ts_entire)
+
+# Display accuracy metrics for the training set
+print('B1 Below')
+accuracy_metrics_above
+print('B1 Above')
+accuracy_metrics_below
+```
+
+```{r}
+# Extract values for above plot
+actual_values <- as.vector(B1_above_ts_entire)
+
+# Create a data frame with actual and predicted values
+results_df <- data.frame(
+  Date = B1_above$DATE,
+  Actual = actual_values,
+  Predicted = predicted_values_above
+)
+
+# Display the data frame
+results_df
+
+# Plot above results
+ggplot(results_df, aes(x = Date)) +
+  geom_line(aes(y = Actual, color = "Actual"), linewidth = 1) +
+  geom_line(aes(y = Predicted, color = "Predicted"), linewidth = 1) +
+  labs(title = "B1 Above- Actual vs Predicted Time Series",
+       x = "Date",
+       y = "Value") +
+  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red")) +
+  theme_minimal()
+```
+
+```{r}
+# Extract values for below plot
+actual_values <- as.vector(B1_below_ts_entire)
+
+# Create a data frame with actual and predicted values
+results_df <- data.frame(
+  Date = B1_below$DATE,
+  Actual = actual_values,
+  Predicted = predicted_values_below
+)
+
+# Display the data frame
+results_df
+
+# Plot above results
+ggplot(results_df, aes(x = Date)) +
+  geom_line(aes(y = Actual, color = "Actual"), linewidth = 1) +
+  geom_line(aes(y = Predicted, color = "Predicted"), linewidth = 1) +
+  labs(title = "B1 Below- Actual vs Predicted Time Series",
+       x = "Date",
+       y = "Value") +
+  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red")) +
+  theme_minimal()
+```
+
+```{r}
+# Specify the forecast horizon (12 months)
+forecast_horizon <- 12
+
+# Generate forecasts using the neural network model
+forecast_values_nn_above <- forecast(nn_model_full_B1_above, h = forecast_horizon)
+forecast_values_nn_below <- forecast(nn_model_full_B1_below, h = forecast_horizon)
+
+# Extract predicted values
+predicted_values_above <- forecast_values_nn_above$mean
+predicted_values_below <- forecast_values_nn_below$mean
+
+# Convert values to vector
+actual_values_above <- as.vector(predicted_values_above)
+actual_values_below <- as.vector(predicted_values_below)
+
+# Create month breakdown
+months <- c("Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", 
+            "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec.")
+
+# Create a data frame
+summary_df <- data.frame(
+  Months = factor(months, levels = months),
+  Above = actual_values_above,
+  Below = actual_values_below
+)
+
+# Plot the difference
+ggplot(summary_df, aes(x = Months, group = 1)) +
+  geom_line(aes(y = Above, color = "Above"), size = 1) +
+  geom_line(aes(y = Below, color = "Below"), size = 1) +
+  labs(title = "12-month Forecast: Above vs Below",
+       x = "Months",
+       y = "Value") +
+  scale_color_manual(values = c("Above" = "blue", "Below" = "red")) +
+  theme_minimal()
+
+# Display the forecasted values
+print("B1 Above Forecast:")
+print(predicted_values_above)
+
+print("B1 Below Forecast:")
+print(predicted_values_below)
+```
+
+# ARIMA model
+
+```{r}
+# Fit an ARIMA model to training subset
+arima_model_B1_above <- auto.arima(B1_above_ts_entire)
+arima_model_B1_below <- auto.arima(B1_below_ts_entire)
+
+# Print model summary
+summary(arima_model_B1_above) 
+summary(arima_model_B1_below) 
+
+# Generate forecasts using the ARIMA model
+forecast_values_above <- forecast(arima_model_B1_above, h = length(B1_above_ts_entire))
+forecast_values_below <- forecast(arima_model_B1_below, h = length(B1_below_ts_entire))
+
+# Create a data frame with actual vs predicted vs difference values
+results_above_df <- data.frame(
+  Date = B1_above$DATE,
+  Actual = B1_above_ts_entire,
+  Predicted = forecast_values_above$mean
+)
+results_below_df <- data.frame(
+  Date = B1_below$DATE,
+  Actual = B1_below_ts_entire,
+  Predicted = forecast_values_below$mean
+)
+
+# Display the results
+forecast_values_above
+forecast_values_below
+```
+
+```{r}
+# Plot above results
+ggplot(results_above_df, aes(x = Date)) +
+  geom_line(aes(y = Actual, color = "Actual"), linewidth = 1) +
+  geom_line(aes(y = Predicted, color = "Predicted"), linewidth = 1) +
+  labs(title = "B1 Above- Actual vs Predicted Time Series",
+       x = "Date",
+       y = "Value") +
+  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red")) +
+  theme_minimal()
+
+# Plot above results
+ggplot(results_below_df, aes(x = Date)) +
+  geom_line(aes(y = Actual, color = "Actual"), linewidth = 1) +
+  geom_line(aes(y = Predicted, color = "Predicted"), linewidth = 1) +
+  labs(title = "B1 Below- Actual vs Predicted Time Series",
+       x = "Date",
+       y = "Value") +
+  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red")) +
+  theme_minimal()
+```
+
+
+
+
+
+
