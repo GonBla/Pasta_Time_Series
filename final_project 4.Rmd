@@ -1,0 +1,1201 @@
+---
+title: "ADS506 Final Proyect <Dataset name>"
+author: "Jesse Gutierrez and Gonzalo Blazquez"
+date: "`r Sys.Date()`"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(forecast)
+library(zoo)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+
+set.seed(506)
+```
+
+**Data Source**
+
+The dataset was found under the UCI publicly available repository with additional supporting data at Mendeley Data. The information presented was gathered from four national pasta brands and is compiled of 118 daily time series SKU-level sales of pasta from 01/01/2014 to 31/12/2018. The dataset has 1798 observations for 118 different types of pastas with 118 rows representing daily sales at normal price and 118 columns for the sales with a promotion.
+
+Besides univariate time series data, the quantity sold is integrated by information on the presence or the absence of a promotion.
+
+<https://archive.ics.uci.edu/dataset/611/hierarchical+sales+data> <https://data.mendeley.com/datasets/njdkntcpc9/1>
+
+**Importing the Data**
+
+As the dataset file was not available for download under the UCI repository, an available CSV file was downloaded from Data Mendeley. This file was saved to a corresponding folder within the researchers computer and then imported into R using the ensuing code.
+
+```{r}
+# Import the potential data set
+df <- read.csv('/Users/Gonzalo B/Downloads/Applied_Time_Series_Analysis/TeamProject/hierarchical_sales_data.csv')
+
+# Display the first few rows to see the format of the dates included
+head(df)
+```
+
+```{r}
+# Display the total range of the dates for all 118 observations
+start_date <- head(df$DATE, 1)
+end_date <- tail(df$DATE, 1)
+cat('The sales in this dataset range from ', start_date, 'to', end_date)
+```
+
+As evident with the above output, the sales the grocery store for the 118 items range from January 2, 2014 to December 31, 2018. This allows for five annual cycles of the sales of 118 different products within in a grocery store to compare the impact that the promotions made.
+
+```{r}
+# Check for missing values
+sum(is.na(df))
+```
+
+```{r}
+# Convert the date column to the correct format
+df$DATE <- as.Date(df$DATE)
+
+# Display the output for verification
+head(df)
+```
+
+```{r}
+# Sum all products quantities by day
+date_sum <- df |>
+  select(starts_with("QTY_B")) |>
+  rowSums(na.rm = TRUE)
+
+# Create df with the sums
+date_total <- data.frame(
+  df$DATE,
+  Sales_Sum = unlist(date_sum)
+)
+date_total
+```
+
+
+```{r}
+# Add the month column
+data_new1 <- date_total                                
+data_new1$year_month <- floor_date(data_new1$df.DATE,  
+                                   "month")
+#head(data_new1)                                     
+
+# Create new df that aggregates data by month
+data_aggr1 <- data_new1 |>                         
+  group_by(year_month) |> 
+  dplyr::summarize(Sales_Sum = sum(Sales_Sum))|> 
+  as.data.frame()
+
+#head(data_aggr1)
+
+# Plot monthly sales 
+sales.ts <- ts(data_aggr1$Sales_Sum, start = c(2014,1), end = c(2018,12), freq = 12)
+plot(sales.ts, main="Monthly Sales over time" ,
+     xlab = "Month", ylab = "Sales",
+     ylim = c(4000, 20000), bty = "l")
+
+# Plot yearly seasons 
+ggseasonplot(sales.ts, year.labels=TRUE, year.labels.left=TRUE) +
+  ylab("Sales") +
+  ggtitle("Seasonal plot: monthly sales")
+```
+
+```{r}
+# Create df with the sum of sales and promo by brand for each day
+# Sales
+date_sum_b1 <- df %>%
+  select(starts_with("QTY_B1")) |>
+  rowSums(na.rm = TRUE)
+date_sum_b2 <- df %>%
+  select(starts_with("QTY_B2")) |>
+  rowSums(na.rm = TRUE)
+date_sum_b3 <- df %>%
+  select(starts_with("QTY_B3")) |>
+  rowSums(na.rm = TRUE)
+date_sum_b4 <- df %>%
+  select(starts_with("QTY_B4")) |>
+  rowSums(na.rm = TRUE)
+# Promos
+date_sum_pb1 <- df %>%
+  select(starts_with("PROMO_B1")) |>
+  rowSums(na.rm = TRUE)
+date_sum_pb2 <- df %>%
+  select(starts_with("PROMO_B2")) |>
+  rowSums(na.rm = TRUE)
+date_sum_pb3 <- df %>%
+  select(starts_with("PROMO_B3")) |>
+  rowSums(na.rm = TRUE)
+date_sum_pb4 <- df %>%
+  select(starts_with("PROMO_B4")) |>
+  rowSums(na.rm = TRUE)
+
+# df
+date_total_B <- data.frame(
+  df$DATE,
+  Sales_Sum = unlist(date_sum),
+  Sales_Sum_b1 = unlist(date_sum_b1),
+  Sales_Sum_b2 = unlist(date_sum_b2),
+  Sales_Sum_b3 = unlist(date_sum_b3),
+  Sales_Sum_b4 = unlist(date_sum_b4),
+  Promo_Sum_b1 = unlist(date_sum_pb1),
+  Promo_Sum_b2 = unlist(date_sum_pb2),
+  Promo_Sum_b3 = unlist(date_sum_pb3),
+  Promo_Sum_b4 = unlist(date_sum_pb4)
+ 
+)
+date_total_B
+```
+
+```{r}
+# Create a new column for the month
+date_total_B$Month <- format(df$DATE, "%Y-%m")
+
+# Group by month and calculate the sum
+monthly_sum <- date_total_B |>
+  group_by(Month) |>
+  summarise(
+    Sales_Sum = sum(Sales_Sum),
+    Sales_Sum_b1 = sum(Sales_Sum_b1),
+    Sales_Sum_b2 = sum(Sales_Sum_b2),
+    Sales_Sum_b3 = sum(Sales_Sum_b3),
+    Sales_Sum_b4 = sum(Sales_Sum_b4),
+    Promo_Sum_b1 = sum(Promo_Sum_b1),
+    Promo_Sum_b2 = sum(Promo_Sum_b2),
+    Promo_Sum_b3 = sum(Promo_Sum_b3),
+    Promo_Sum_b4 = sum(Promo_Sum_b4)
+  )
+monthly_sum
+```
+
+```{r}
+# Plot monthly sales by brand
+sales_b.ts2 <- ts(monthly_sum[,c(3:6)], start = c(2014,1), end = c(2018,12), freq = 12)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Month", ylab = "Sales", main = "Monthly Sales by Brand")
+legend("topleft", colnames(sales_b.ts2), lty = 1, col = 1:4, bty = "n")
+```
+
+```{r}
+# Plot monthly promos by brand
+sales_b.ts2 <- ts(monthly_sum[,c(7:10)], start = c(2014,1), end = c(2018,12), freq = 12)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Month", ylab = "Promos", main = "Monthly Promos by Brand")
+legend("topleft", colnames(sales_b.ts2), lty = 1, col = 1:4, bty = "n")
+```
+
+
+
+```{r}
+# Create the week and year columns
+date_total_B$Week <- week(date_total_B$df.DATE)
+date_total_B$Year <- year(date_total_B$df.DATE)
+
+# Group by Week and summarize
+weekly_sum <- date_total_B |>
+  group_by(Year, Week) |>
+  summarize(
+    Sales_Sum = sum(Sales_Sum),
+    Sales_Sum_b1 = sum(Sales_Sum_b1),
+    Sales_Sum_b2 = sum(Sales_Sum_b2),
+    Sales_Sum_b3 = sum(Sales_Sum_b3),
+    Sales_Sum_b4 = sum(Sales_Sum_b4),
+    Promo_Sum_b1 = sum(Promo_Sum_b1),
+    Promo_Sum_b2 = sum(Promo_Sum_b2),
+    Promo_Sum_b3 = sum(Promo_Sum_b3),
+    Promo_Sum_b4 = sum(Promo_Sum_b4)
+  )
+weekly_sum
+```
+
+```{r}
+# Plot
+sales_b.ts2 <- ts(weekly_sum[,c(4:7)], start = c(2014,1), end = c(2018,52), freq = 52)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Week", ylab = "Sales", main = "Weekly Sales by Brand")
+legend("topleft", colnames(sales_b.ts2), lty = 1, col = 1:4, bty = "n")
+```
+
+```{r}
+# Plot
+sales_b.ts2 <- ts(weekly_sum[,c(8:11)], start = c(2014,1), end = c(2018,52), freq = 52)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Week", ylab = "Promos", main = "Weekly Promos by Brand")
+legend("topleft", colnames(sales_b.ts2), lty = 1, col = 1:4, bty = "n")
+```
+
+
+```{r}
+# Scatter plot
+ggplot(weekly_sum, aes(x = Promo_Sum_b1, y = Sales_Sum_b1)) +
+  geom_point() +
+  labs(title = paste("Scatter Plot of Weekly Sales vs Weekly Promos for B1"),
+       x = "Weekly Promos",
+       y = "Weekly Sales") +
+  theme_minimal()
+```
+
+
+```{r}
+# Weekly sales / promos
+weekly_sum$Sales_Promo_Ratio <- weekly_sum$Sales_Sum_b1 / pmax(weekly_sum$Promo_Sum_b1, -1)
+
+weekly_sum
+# Plot
+sales_b.ts2 <- ts(weekly_sum[,c(12)], start = c(2014,1), end = c(2018,52), freq = 52)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Month", ylab = "Promos", main = "Weekly Sales/Promos", ylim=c(0,50))
+
+```
+
+
+```{r}
+# Create df for the products of brand 1
+# B1 sales quantities
+date_sumB1 <- df |>
+  select(starts_with("QTY_B1"))
+
+date_totalB1 <- data.frame(
+  df$DATE,
+  Sales_Sum = date_sumB1
+)
+# B1 promos
+date_promoB1 <- df |>
+  select(starts_with("PROMO_B1"))
+
+date_totalPB1 <- data.frame(
+  df$DATE,
+  Sales_Sum = date_promoB1
+)
+# Unpivot sales and promos
+df_long <- reshape(date_totalB1, idvar = "df.DATE", varying = list(names(date_totalB1)[-1]), v.names = "Sales", direction = "long", timevar = "Product")
+df_long_Pr <- reshape(date_totalPB1, idvar = "df.DATE", varying = list(names(date_totalPB1)[-1]), v.names = "Promo", direction = "long", timevar = "Product")
+# Rename the Category column
+df_long$Product <- gsub("Sales_Sum.QTY_B1_", "", df_long$Product)
+df_long_Pr$Product <- gsub("Sales_Sum.PROMO_B1_", "", df_long_Pr$Product)
+# Join sales and promos
+result_P_b1 <- left_join(df_long, df_long_Pr, by = c("df.DATE","Product"))
+
+result_P_b1
+```
+
+
+```{r}
+# Plot sales for a product 
+product <- "3"
+
+# Filter the dataframe for the specified category and Quantity.y is 0
+df_filtered <- subset(result_P_b1, Product == product)
+
+# Plot with different colors for Quantity.y
+ggplot(df_filtered, aes(x = df.DATE, y = Sales, color = factor(Promo))) +
+  geom_point() +
+  labs(title = paste("Scatter Plot for Product", product),
+       x = "Date",
+       y = "Sales",
+       color = "Promo") +
+  theme_minimal()
+```
+
+
+```{r}
+# Plot sales for a product 
+product <- "12"
+
+# Filter the dataframe for the specified category and Quantity.y is 0
+df_filtered <- subset(result_P_b1, Product == product)
+
+# Plot with different colors for Quantity.y
+ggplot(df_filtered, aes(x = df.DATE, y = Sales, color = factor(Promo))) +
+  geom_point() +
+  labs(title = paste("Scatter Plot for Product", product),
+       x = "Date",
+       y = "Sales",
+       color = "Promo") +
+  theme_minimal()
+```
+
+
+```{r}
+# Get the average monthly sales by product and promo
+df_avg_sales_monthly <- result_P_b1 |>
+  mutate(Month = floor_date(df.DATE, unit = "month")) |>  
+  group_by(Product, Month, Promo) |>
+  summarize(Avg_Sales = mean(Sales))
+
+# Filter for Promo equal to 0 and 1
+sales_monthly_promo0 <- filter(df_avg_sales_monthly, Promo == 0)
+sales_monthly_promo1 <- filter(df_avg_sales_monthly, Promo == 1)
+# Join tables to get the desired format
+monthly_avg_promo <- left_join(sales_monthly_promo0, sales_monthly_promo1, by = c("Month","Product"))
+
+# Create column with the promo effect
+monthly_avg_promo$Promo_effect <- ifelse(monthly_avg_promo$Avg_Sales.x == 0, 1, monthly_avg_promo$Avg_Sales.y / monthly_avg_promo$Avg_Sales.x)
+# Change column names
+colnames(monthly_avg_promo)[colnames(monthly_avg_promo) == "Avg_Sales.x"] <- "Avg_Sales_No_promo"
+colnames(monthly_avg_promo)[colnames(monthly_avg_promo) == "Avg_Sales.y"] <- "Avg_Sales_promo"
+#promo effect table
+monthly_avg_promo
+```
+
+```{r}
+# Add month column
+result_P_b1 <- result_P_b1 |>
+  mutate(Month = floor_date(df.DATE, unit = "month"))   
+  
+# Join the table with b1 product with the promo effect table
+result_promo <- left_join(result_P_b1, monthly_avg_promo, by = c("Month","Product"))
+# If promo effect is NA replace with 1
+result_promo$Promo_effect <- ifelse(is.na(result_promo$Promo_effect), 1, result_promo$Promo_effect)
+# Create a sales with promo and no promo columns
+result_promo$Sales_NoPromo <- ifelse(result_promo$Promo == 0, result_promo$Sales, result_promo$Sales/result_promo$Promo_effect)
+result_promo$Sales_Promo <- ifelse(result_promo$Promo == 1, result_promo$Sales, result_promo$Sales*result_promo$Promo_effect)
+# Remove redundant columns for promo
+result_promo <- result_promo[,-c(6,8)]
+
+result_promo
+```
+
+```{r}
+# Analize the new data by month
+data_new3 <- result_promo |>
+  select(df.DATE, Sales, Sales_NoPromo, Sales_Promo)
+
+data_new3$year_month <- floor_date(data_new3$df.DATE,  
+                                   "month")
+#head(data_new3)                                     
+# df to compare different sales scenarios
+data_aggr3 <- data_new3 |>                        
+  group_by(year_month) |> 
+  dplyr::summarize(
+    Sales = sum(Sales),
+    Sales_NoPromo = sum(Sales_NoPromo),
+    Sales_Promo = sum(Sales_Promo)
+    ) |> 
+  as.data.frame()
+
+#head(data_aggr3) 
+# Plot
+sales_b.ts2 <- ts(data_aggr3[,c(2:4)], start = c(2014,1), end = c(2018,12), freq = 12)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:3, xlab = "Month", ylab = "Sales", main = "Sales in three scenarios")
+```
+
+
+
+```{r}
+
+train_sale_ts <- window(sales_b.ts2[,c(1:1)], end = c(2017,12))
+valid_sale_ts <- window(sales_b.ts2[,c(1:1)], start = c(2018,1))
+#valid_sale_ts
+regsales.lm.model <- tslm(train_sale_ts ~ trend + season, train_sale_ts)
+
+#summary(regsales.lm.model)
+
+regsales.lm.pred <- forecast(regsales.lm.model, h = 12)
+
+autoplot(train_sale_ts, series = 'train') +
+  autolayer(valid_sale_ts, series = 'actual') +
+  autolayer(regsales.lm.pred$mean, series = 'prediction', alpha=.8) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2014, 2019)) +
+  labs(title = "Forecast for Sales")
+#train_sale_ts
+#valid_sale_ts
+accuracy(regsales.lm.pred, valid_sale_ts)
+
+regsales.lm.pred
+```
+
+
+```{r}
+# Create the product ranking by promo effect
+rank_pro <- result_promo |>
+  group_by(Product) |>
+  summarize(Avg_Promo_effect = mean(Promo_effect, na.rm = TRUE))|>
+  arrange(desc(Avg_Promo_effect))
+# Get the upper half
+upper_half <- result[1:21, ]$Product
+
+head(rank_pro)
+tail(rank_pro)
+upper_half
+```
+
+
+```{r}
+# Create the mix promo column
+
+result_promo$Sales_MixPromo <- ifelse(result_promo$Product %in% upper_half, result_promo$Sales_Promo, result_promo$Sales_NoPromo)
+# Aggregate data by day
+data_aggr_day <- result_promo |>                         
+  group_by(df.DATE) |> 
+  dplyr::summarize(
+    Sales = sum(Sales),
+    Sales_NoPromo = sum(Sales_NoPromo),
+    Sales_Promo = sum(Sales_Promo),
+    Sales_MixPromo = sum(Sales_MixPromo)
+    ) |> 
+  as.data.frame()
+
+# Create df with sales columns
+data_new3 <- result_promo |>
+  select(df.DATE, Sales, Sales_NoPromo, Sales_Promo, Sales_MixPromo)
+# Create year-month column
+data_new3$year_month <- floor_date(data_new3$df.DATE,  
+                                   "month")
+# Aggregate data by month
+data_aggr3 <- data_new3 |>                         
+  group_by(year_month) |> 
+  dplyr::summarize(
+    Sales = sum(Sales),
+    Sales_NoPromo = sum(Sales_NoPromo),
+    Sales_Promo = sum(Sales_Promo),
+    Sales_MixPromo = sum(Sales_MixPromo)
+    ) |> 
+  as.data.frame()
+
+head(data_aggr3) 
+# Plot monthly sales 
+sales_b.ts2 <- ts(data_aggr3[,c(2:5)], start = c(2014,1), end = c(2018,12), freq = 12)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Month", ylab = "Sales", main = "Sales in three scenarios")
+# Plot daily sales
+sales_b.ts2 <- ts(data_aggr_day[,c(2:5)], start = c(2014,1), end = c(2018,365), freq = 365)
+#sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Date", ylab = "Sales", main = "Sales in three scenarios", xlim = c(2014, 2019), ylim = c(0, 1500))
+legend("topleft", colnames(sales_b.ts2), lty = 1, col = 1:4, bty = "n")
+
+```
+
+```{r}
+# Define the time series to work with the models
+sales_b.ts2 <- ts(data_aggr_day[,c(2:5)], start = c(2014,1), end = c(2018,365), freq = 365)
+head(sales_b.ts2)
+# Regular sales
+train_sale_ts <- window(sales_b.ts2[,c(1:1)], end = c(2017,365))
+valid_sale_ts <- window(sales_b.ts2[,c(1:1)], start = c(2018,1))
+# Promo Mix
+train_sale_pr <- window(sales_b.ts2[,c(4:4)], end = c(2017,365))
+valid_sale_pr <- window(sales_b.ts2[,c(4:4)], start = c(2018,1))
+# Total Series
+train_sale_ts_Mix <- window(sales_b.ts2[,c(4:4)], end = c(2018,365))
+train_sale_ts_Reg <- window(sales_b.ts2[,c(1:1)], end = c(2018,365))
+
+```
+
+
+
+
+
+```{r}
+# Linear Model for Sales
+
+# Fit
+regsales.lm.model <- tslm(train_sale_ts ~ trend + season, train_sale_ts)
+
+summary(regsales.lm.model)
+# Forecast
+regsales.lm.pred <- forecast(regsales.lm.model, h = 365)
+# Plot
+autoplot(train_sale_ts, series = 'train') +
+  autolayer(valid_sale_ts, series = 'actual') +
+  autolayer(regsales.lm.pred$mean, series = 'prediction', alpha=.8) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2017, 2019)) +
+  labs(title = "Forecast for Sales")+
+  ylab("Sales")+
+  xlab("Date")
+# Measures
+LM_Sales_ac <- accuracy(regsales.lm.pred, valid_sale_ts)
+```
+
+```{r}
+# Linear Model for Sales with mix promo
+
+# Fit
+mixsales.lm.model <- tslm(train_sale_pr ~ trend + season, train_sale_ts)
+
+summary(mixsales.lm.model)
+# Forecast
+mixsales.lm.pred <- forecast(mixsales.lm.model, h = 365)
+# Plot
+autoplot(train_sale_pr, series = 'train') +
+  autolayer(valid_sale_pr, series = 'actual') +
+  autolayer(mixsales.lm.pred$mean, series = 'prediction', alpha=.8) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2017, 2019)) +
+  labs(title = "Forecast for Sales with Mix Promo")+
+  ylab("Sales")+
+  xlab("Date")
+# Measures
+LM_Mix_ac <- accuracy(mixsales.lm.pred, valid_sale_pr)
+```
+
+
+
+```{r}
+# ARIMA Model
+arima_model <- auto.arima(train_sale_ts)
+```
+
+```{r}
+# Display the model summary
+summary(arima_model)
+
+# Forecast
+forecast_values <- forecast(arima_model, h = 365)
+
+autoplot(train_sale_ts, series = 'train') +
+  autolayer(valid_sale_ts, series = 'actual') +
+  autolayer(forecast_values$mean, series = 'prediction', alpha=.4) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2017, 2019)) +
+  labs(title = "Forecast for Sales")+
+  ylab("Sales")+
+  xlab("Date")
+# Measures
+AR_Sales_ac <- accuracy(forecast_values, valid_sale_ts)
+```
+
+```{r}
+# ARIMA Model for Sales with mix promo
+arima_model_pr <- auto.arima(train_sale_pr)
+```
+
+```{r}
+# Display the model summary
+summary(arima_model_pr)
+
+# Forecast
+forecast_values <- forecast(arima_model_pr, h = 365)
+
+autoplot(train_sale_pr, series = 'train') +
+  autolayer(valid_sale_pr, series = 'actual') +
+  autolayer(forecast_values$mean, series = 'prediction', alpha=.4) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2017, 2019)) +
+  labs(title = "Forecast for Sales with mix promo")+
+  ylab("Sales")+
+  xlab("Date")
+# Measures
+AR_Mix_ac <- accuracy(forecast_values, valid_sale_pr)
+```
+
+
+
+```{r}
+############################################### takes an hour
+# Neural Network loop to find the best parameters based on the lowest RMSE
+best_rmse <- Inf
+best_model <- NULL
+
+for (p in seq(1, 20)) {
+  for (P in seq(1, 5)) {
+    for (size in seq(5, 20, by = 5)) {
+      nnetar_model <- nnetar(train_sale_ts, p = p, P = P, size = size)
+      forecast_values <- forecast(nnetar_model,365)
+      rmse <- sqrt(mean((forecast_values$mean - valid_sale_ts)^2))
+
+      if (rmse < best_rmse) {
+        best_rmse <- rmse
+        best_model <- nnetar_model
+      }
+    }
+  }
+}
+```
+
+```{r}
+best_model
+best_rmse
+```
+
+
+```{r}
+# Forecast
+pasta.nnetar.pred <- forecast(best_model, h = 365)
+
+# Plot
+autoplot(train_sale_ts, series = 'train') +
+  autolayer(valid_sale_ts, series = 'actual') +
+  autolayer(pasta.nnetar.pred$mean, series = 'prediction', alpha=.4) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2017, 2019)) +
+  labs(title = "Forecast for Sales")+
+  ylab("Sales")+
+  xlab("Date")
+# Measures
+NN_Sales_ac <- accuracy(pasta.nnetar.pred, valid_sale_ts)
+```
+
+```{r}
+############################################### takes an hour
+# Mix Promo Neural network
+# Neural Network loop to find the best parameters based on the lowest RMSE
+best_rmse <- Inf
+best_model_pr <- NULL
+
+for (p in seq(1, 20)) {
+  for (P in seq(1, 5)) {
+    for (size in seq(5, 20, by = 5)) {
+      nnetar_model <- nnetar(train_sale_pr, p = p, P = P, size = size, parallel = TRUE)
+      forecast_values <- forecast(nnetar_model,365)
+      rmse <- sqrt(mean((forecast_values$mean - valid_sale_pr)^2))
+
+      if (rmse < best_rmse) {
+        best_rmse <- rmse
+        best_model_pr <- nnetar_model
+      }
+    }
+  }
+}
+```
+
+```{r}
+best_model_pr
+best_rmse
+```
+
+```{r}
+# Forecast
+pasta.nnetar.pred <- forecast(best_model_pr, h = 365)
+
+# Plot
+autoplot(train_sale_pr, series = 'train') +
+  autolayer(valid_sale_pr, series = 'actual') +
+  autolayer(pasta.nnetar.pred$mean, series = 'prediction', alpha=.4) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2017, 2019)) +
+  labs(title = "Forecast for Sales with Mix Promo")+
+  ylab("Sales")+
+  xlab("Date")
+# Measures
+NN_Mix_ac <- accuracy(pasta.nnetar.pred, valid_sale_pr)
+```
+
+
+
+```{r}
+# Create tables with accuracy measures for Sales
+accuracy_train <- data.frame(
+  Model = c("Linear Model", "ARIMA Model", "Neural Network Model"),
+  ME_train = c(LM_Sales_ac["Training set", "ME"], AR_Sales_ac["Training set", "ME"], NN_Sales_ac["Training set", "ME"]),
+  RSME_train = c(LM_Sales_ac["Training set", "RMSE"], AR_Sales_ac["Training set", "RMSE"], NN_Sales_ac["Training set", "RMSE"]),
+  MAE_train = c(LM_Sales_ac["Training set", "MAE"], AR_Sales_ac["Training set", "MAE"], NN_Sales_ac["Training set", "MAE"])
+)
+accuracy_train
+accuracy_test <- data.frame(
+  Model = c("Linear Model", "ARIMA Model", "Neural Network Model"),
+  ME_test = c(LM_Sales_ac["Test set", "ME"], AR_Sales_ac["Test set", "ME"], NN_Sales_ac["Test set", "ME"]),
+  RSME_test = c(LM_Sales_ac["Test set", "RMSE"], AR_Sales_ac["Test set", "RMSE"], NN_Sales_ac["Test set", "RMSE"]),
+  MAE_test = c(LM_Sales_ac["Test set", "MAE"], AR_Sales_ac["Test set", "MAE"], NN_Sales_ac["Test set", "MAE"])
+)
+accuracy_test
+```
+
+```{r}
+# Create tables with accuracy measures for Mix Promos
+accuracy_train_mix <- data.frame(
+  Model = c("Linear Model", "ARIMA Model", "Neural Network Model"),
+  ME_train = c(LM_Mix_ac["Training set", "ME"], AR_Mix_ac["Training set", "ME"], NN_Mix_ac["Training set", "ME"]),
+  RSME_train = c(LM_Mix_ac["Training set", "RMSE"], AR_Mix_ac["Training set", "RMSE"], NN_Mix_ac["Training set", "RMSE"]),
+  MAE_train = c(LM_Mix_ac["Training set", "MAE"], AR_Mix_ac["Training set", "MAE"], NN_Mix_ac["Training set", "MAE"])
+)
+accuracy_train_mix
+accuracy_test_mix <- data.frame(
+  Model = c("Linear Model", "ARIMA Model", "Neural Network Model"),
+  ME_test = c(LM_Mix_ac["Test set", "ME"], AR_Mix_ac["Test set", "ME"], NN_Mix_ac["Test set", "ME"]),
+  RSME_test = c(LM_Mix_ac["Test set", "RMSE"], AR_Mix_ac["Test set", "RMSE"], NN_Mix_ac["Test set", "RMSE"]),
+  MAE_test = c(LM_Mix_ac["Test set", "MAE"], AR_Mix_ac["Test set", "MAE"], NN_Mix_ac["Test set", "MAE"])
+)
+accuracy_test_mix
+```
+
+
+
+
+
+
+```{r}
+# Final Model forecast
+
+# Fit
+mixsales.model <- tslm(train_sale_ts_Mix ~ trend + season, train_sale_ts_Mix)
+regsales.model <- tslm(train_sale_ts_Reg ~ trend + season, train_sale_ts_Reg)
+#regsales.model <- nnetar(train_sale_ts_Reg, p = 9, P = 3, size =10)
+
+#summary(mixsales.lm.model2)
+# Forecast
+mixsales.pred <- forecast(mixsales.model, h = 365)
+regsales.pred <- forecast(regsales.model, h = 365)
+# Plot
+autoplot(train_sale_ts_Reg, series = 'actual') +
+  autolayer(regsales.pred$mean, series = 'regular prediction') +
+  autolayer(mixsales.pred$mean, series = 'new promo prediction', alpha=.8) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2018.5, 2020), ylim = c(0,550)) +
+  labs(title = "Forecast for Actual scenario vs New promo proposal")+
+  ylab("Sales")+
+  xlab("Date")
+
+```
+
+```{r}
+# Compare predictions
+anual_mix_sales <- sum(mixsales.pred$mean)
+anual_reg_sales <- sum(regsales.pred$mean)
+
+anual_mix_sales
+anual_reg_sales
+anual_mix_sales-anual_reg_sales
+(anual_mix_sales/anual_reg_sales)-1
+```
+
+
+
+```{r}
+# Calculate total sums for sales
+sales_sum <- df %>%
+  select(starts_with("QTY_B")) %>%
+  summarise(across(everything(), sum))
+
+# Calculate total sums for promotional sales
+promo_sum <- df %>%
+  select(starts_with("PROMO_B")) %>%
+  summarise(across(everything(), sum))
+
+# Create a data frame for the differences
+annual_differences <- data.frame(
+  Sales_Column = colnames(sales_sum),
+  Sales_Sum = unlist(sales_sum),
+  Promo_Sum = unlist(promo_sum),
+  Promo_Makeup = round(unlist(promo_sum)/(unlist(sales_sum) + unlist(promo_sum)) * 100, 2)
+)
+
+# Sort by Sales-Sum in desc. order
+annual_differences <- annual_differences %>%
+  arrange(desc(Sales_Sum))
+
+# Display the first 20 rows of the table
+head(annual_differences, 20)
+```
+
+```{r}
+# List the highest performing 10% of products
+top_performers <- head(annual_differences, 12)
+
+# Display the lowest performers
+top_performers
+```
+
+```{r}
+# List the lowest performing 10% of products
+low_performers <- tail(annual_differences, 12)
+
+# Display the lowest performers
+low_performers
+```
+
+```{r}
+# Combine the low and top performing products into a singular data frame for plotting
+combined_data <- rbind(
+  data.frame(Group = "Top Performers", Sales = top_performers$Sales_Sum, Promo = top_performers$Promo_Sum, Makeup = top_performers$Promo_Makeup),
+  data.frame(Group = "Low Performers", Sales = low_performers$Sales_Sum, Promo = low_performers$Promo_Sum, Makeup = low_performers$Promo_Makeup)
+)
+```
+
+```{r}
+# Create a boxplot to compare low & high performing product sales
+ggplot(combined_data, aes(x = Group, y = Sales, fill = Group)) +
+  geom_boxplot() +
+  labs(x = "Performance Group", y = "Sales") +
+  scale_fill_manual(values = c("Top Performers" = "blue", "Low Performers" = "red")) +
+  ggtitle("Boxplot of Sales for Top vs. Low Performers") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12)
+  )
+```
+
+To no surprise, the top performing products had a significantly higher range of sales compared to low performers.
+
+```{r}
+# Create a boxplot to compare low & high performing product Promo sales
+ggplot(combined_data, aes(x = Group, y = Promo, fill = Group)) +
+  geom_boxplot() +
+  labs(x = "Performance Group", y = "Promo") +
+  scale_fill_manual(values = c("Top Performers" = "blue", "Low Performers" = "red")) +
+  ggtitle("Promo Sales for Top vs. Low Performers") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12)
+  )
+```
+
+This boxplot shows that top performing products also had significantly more promotional sales than the low performing. This is a value that we need to be mindful of the popularity of the given products that may drastically vary between groups.
+
+```{r}
+# Create a boxplot to compare low & high performing product Makeup sales
+ggplot(combined_data, aes(x = Group, y = Makeup, fill = Group)) +
+  geom_boxplot() +
+  labs(x = "Performance Group", y = "Makeup") +
+  scale_fill_manual(values = c("Top Performers" = "blue", "Low Performers" = "red")) +
+  ggtitle("Promo Makeup for Top vs. Low Performers") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12)
+  )
+```
+
+The last boxplot was interesting to see that the low performing products sales did predominately occur during a promotional period highlighting the significance of marketing efforts.
+
+```{r}
+# Create a stacked bar graph
+ggplot(low_performers, aes(x = Sales_Column, y = Sales_Sum, fill = Promo_Sum)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(x = "Products", y = "Total Sales") +
+  scale_fill_gradient(low = "blue", high = "red") +  # Customize the color scale
+  ggtitle("Low Performing Product Sales Makeup") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text.x = element_text(size = 12, angle = 90),
+    axis.text.y = element_text(size = 12
+  ))
+```
+
+When focusing on the lowest performing products, a focus was made on identifying items that received limited promotions. The idea is to identify products that may greatly benefit from marketing resources. In this instance, the products that appear to not have received much promotional resources is QTY_B2_12, QTY_B2_20, and QTY_B2_45.
+
+```{r}
+# Create a subset w/ what appear to be the lowest promoted products among the low perfromers
+minimal_promo <- low_performers %>%
+  filter(Sales_Column %in% c("QTY_B2_12", "QTY_B2_20", "QTY_B2_45")) %>%
+  arrange(Promo_Makeup)
+
+# Display the results to determine the lowest promoted item
+minimal_promo
+```
+
+We can now confirm that the lowest performing item with minimal promotional resources is QTY_B2_12.
+
+**Time Series Plot**
+
+```{r}
+# Create a line graph with annual sales
+ggplot(df, aes(x = DATE)) +
+  geom_line(aes(y = QTY_B2_12), color = "blue", linetype = "solid") +
+  geom_line(aes(y = PROMO_B2_12), color = "red", linetype = "dashed") +
+  labs(x = "Date", y = "Sales") +
+  ggtitle("Sales Comparison between QTY_B2_12 and PROMO_B2_12") +
+  scale_x_date(date_breaks = "12 months", date_labels = "%Y") +  
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12)
+  )
+```
+
+```{r}
+# Isolate the dataset to just include the product of interest
+low_performing_product <- df[, c("DATE", "QTY_B2_12", "PROMO_B2_12")]
+
+# Display the subset w/ the isolated product
+head(low_performing_product)
+```
+
+```{r}
+# Create a histogram comparing total sum of QTY_B2_12 and PROMO_B2_12
+hist_data <- c(sum(low_performing_product$QTY_B2_12), sum(low_performing_product$PROMO_B2_12))
+
+# Create labels for the plot
+bar_labels <- c("QTY_B2_12", "PROMO_B2_12")
+
+# Plot the histogram
+barplot(hist_data, names.arg = bar_labels, col = c("skyblue", "lightcoral"), main = "Total Sum Comparison",
+        xlab = "Columns", ylab = "Total Sum")
+
+# Add a legend
+legend("topright", legend = bar_labels, fill = c("skyblue", "lightcoral"))
+```
+
+```{r}
+# Load req. libraries
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+
+# Create line plot w/ diff. colors for each year
+ggplot(low_performing_product, aes(x = DATE, y = QTY_B2_12, color = factor(lubridate::year(DATE)))) +
+  geom_line() +
+  geom_point() +
+  labs(title = "QTY_B2_12 Sales Over the Years",
+       x = "Date",
+       y = "QTY_B2_12",
+       color = "Year") +
+  theme_minimal() +
+  scale_color_discrete(name = "Year") +
+  theme(legend.position = "top") +
+  theme(legend.title = element_blank()) +
+  theme(plot.title = element_text(size = 16, face = "bold")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme(legend.text = element_text(size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title = element_text(size = 14)) +
+  scale_x_date(breaks = "1 year", date_labels = "%Y")
+```
+
+```{r}
+# Calculate sum of QTY_B2_12 for each month & year
+sum_qty_by_month <- low_performing_product %>%
+  group_by(month = month(DATE, label = TRUE, abbr = FALSE), year = year(DATE)) %>%
+  summarize(sum_qty = sum(QTY_B2_12), .groups = 'drop')
+
+# Create a line plot w/ sum of QTY_B2_12 for each month & year
+ggplot(sum_qty_by_month, aes(x = month, y = sum_qty, color = as.factor(year), group = year)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Sum of QTY_B2_12 Sales Over Time",
+       x = "Month",
+       y = "Sum of QTY_B2_12",
+       color = "Year") +
+  theme_minimal() +
+  scale_color_discrete(name = "Year") +
+  theme(legend.position = "top") +
+  theme(legend.title = element_blank()) +
+  theme(plot.title = element_text(size = 16, face = "bold")) +
+  theme(legend.text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  
+  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title = element_text(size = 14))
+```
+
+```{r}
+# Calculate sum of PROMO_B2_12 for each month & year
+sum_qty_by_month <- low_performing_product %>%
+  group_by(month = month(DATE, label = TRUE, abbr = FALSE), year = year(DATE)) %>%
+  summarize(sum_qty = sum(PROMO_B2_12), .groups = 'drop')
+
+# Create a line plot w/ sum of PROMO_B2_12 for each month & year
+ggplot(sum_qty_by_month, aes(x = month, y = sum_qty, color = as.factor(year), group = year)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Sum of PROMO_B2_12 Sales Over Time",
+       x = "Month",
+       y = "Sum of PROMO_B2_12",
+       color = "Year") +
+  theme_minimal() +
+  scale_color_discrete(name = "Year") +
+  theme(legend.position = "top") +
+  theme(legend.title = element_blank()) +
+  theme(plot.title = element_text(size = 16, face = "bold")) +
+  theme(legend.text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title = element_text(size = 14))
+```
+
+**Splitting the data**
+
+```{r}
+# Split the data into training (2014-01-02 to 2017-12-31) and validation (2018-01-31 to 2018-12-31)
+training_set <- subset(low_performing_product, DATE >= "2014-01-02" & DATE <= "2017-12-31")
+validation_set <- subset(low_performing_product, DATE >= "2018-01-31" & DATE <= "2018-12-31")
+
+# Display the dimensions of the training and validation sets
+cat("Training Set Dimensions:", dim(training_set), "\n")
+cat("Validation Set Dimensions:", dim(validation_set), "\n")
+```
+
+```{r}
+####GB####
+training_set <- ts(date_total_B[,c(4:4)], start = c(2014,1), end = c(2017,12), freq = 12)
+validation_set <- ts(date_total_B[,c(4:4)], start = c(2018,1), end = c(2018,12), freq = 12)
+training_set
+validation_set
+```
+
+```{r}
+# Fit an ARIMA model to training subset
+arima_model_qty <- auto.arima(training_set)
+
+# Forecast on the validation data
+forecast_validation_qty <- forecast(arima_model_qty, h = 12)
+
+# Display & plot forecast
+print(forecast_validation_qty)
+plot(forecast_validation_qty)
+```
+
+```{r}
+pacf(training_set, lag.max = 72)
+acf(training_set, lag.max = 72)
+```
+
+```{r}
+sqrt(mean(arima_model_qty$residuals^2))
+
+accuracy(forecast(arima_model_qty, h = 12), validation_set)
+```
+
+```{r}
+####GB####
+promo_b.ts <- ts(date_total_B[,c(7:7)], start = c(2014,1), end = c(2018,12), freq = 12)
+
+promo_b.ts
+```
+
+
+```{r}
+regular_sale <-ts(date_total_B[,c(3:3)], start = c(2014,1), end = c(2017,6), freq = 12)
+regular_sale
+```
+```{r}
+acf(regular_sale, lag.max = 24)
+# shows a 7 month seasonality
+```
+
+```{r}
+autoplot(regular_sale)
+```
+
+```{r}
+#####LAB 2.1
+reds.ma <- rollmean(regular_sale, k = 4, align = "right")
+
+autoplot(regular_sale, series = "Actual") +
+  autolayer(reds.ma, series = "MovingAvg") +
+  theme_classic()
+
+
+apple.train <- window(regular_sale, end = c(2016,6))
+apple.test <- window(regular_sale, start = c(2016,7))
+
+length(apple.test)
+
+apple.model <- ses(apple.train, alpha = .6, level = c(.95))
+apple.pred <- forecast(apple.model, h = 10)
+
+autoplot(regular_sale, series = "actual") +
+  autolayer(apple.pred, series = "predicted", alpha = .4) +
+  theme_classic() 
+
+
+autoplot(apple.train, series = "Training") +
+  autolayer(apple.model$fitted, series = "Model") +
+  theme_classic() 
+
+
+# choose alpha with the lowest RMSE
+
+summary(apple.model)
+
+summary( ses(apple.train, alpha = .9, level = c(.95)) )
+
+accuracy(ses(apple.train, alpha = .9, level = c(.95)), apple.test)
+```
+
+```{r}
+#### Regression Model
+regsales.lm.train <- window(regular_sale, end = c(2016,6))
+regsales.lm.test <- window(regular_sale, start = c(2016,7))
+
+regsales.lm.model <- tslm(regsales.lm.train ~ season, regsales.lm.train)
+
+summary(regsales.lm.model)
+
+
+regsales.lm.pred <- forecast(regsales.lm.model, h = 12)
+
+autoplot(regsales.lm.train, series = 'train') +
+  autolayer(regsales.lm.test, series = 'actual') +
+  autolayer(regsales.lm.pred, series = 'prediction', alpha=.4) +
+  theme_classic() 
+
+accuracy(regsales.lm.pred, regsales.lm.test)
+```
+
+
+
+```{r}
+ddata <- decompose(tsdata, "multiplicative")
+
+plot(ddata)
+```
+
+
+**Building Time Series Models**
+
+```{r}
+# Load req. libraries
+library(forecast)
+
+# Create time series object for training set - QTY_B2_12
+ts_train_qty <- ts(training_set$QTY_B2_12, frequency = 365)
+
+# Fit an ARIMA model to training subset
+arima_model_qty <- auto.arima(ts_train_qty)
+
+# Forecast on the validation data
+forecast_validation_qty <- forecast(arima_model_qty, h = length(validation_set))
+
+# Display & plot forecast
+print(forecast_validation_qty)
+plot(forecast_validation_qty)
+
+# Evaluate model's training set performance
+training_residuals_qty <- residuals(arima_model_qty)
+training_rmse_qty <- sqrt(mean(training_residuals_qty^2))
+cat("Training Set RMSE for QTY_B2_12:", training_rmse_qty, "\n")
+
+# Evaluate model's validation set performance
+validation_residuals_qty <- validation_set$QTY_B2_12 - forecast_validation_qty$mean[1:length(validation_set)]
+validation_rmse_qty <- sqrt(mean(validation_residuals_qty^2))
+cat("Validation Set RMSE for QTY_B2_12:", validation_rmse_qty, "\n")
+
+# Create time series object for training set - PROMO_B2_12
+ts_train_promo <- ts(training_set$PROMO_B2_12, frequency = 365)
+
+# Fit an ARIMA model to training subset
+arima_model_promo <- auto.arima(ts_train_promo)
+
+# Forecast on the validation data
+forecast_validation_promo <- forecast(arima_model_promo, h = length(validation_set))
+
+# Display & plot forecast
+print(forecast_validation_promo)
+plot(forecast_validation_promo)
+
+# Evaluate model's training set performance
+training_residuals_promo <- residuals(arima_model_promo)
+training_rmse_promo <- sqrt(mean(training_residuals_promo^2))
+cat("Training Set RMSE for PROMO_B2_12:", training_rmse_promo, "\n")
+
+# Evaluate model's validation set performance
+validation_residuals_promo <- validation_set$PROMO_B2_12 - forecast_validation_promo$mean[1:length(validation_set)]
+validation_rmse_promo <- sqrt(mean(validation_residuals_promo^2))
+cat("Validation Set RMSE for PROMO_B2_12:", validation_rmse_promo, "\n")
+```
+
+**Discussion**
+
+For this project, I was tasked with identifying with low performing item can benefit from promotional material. After reviewing the impact that promotions had on the top 10% of performing products, I decided to further familiarize myself with product QTY_B2_12 with only 1895 sales of which 2.87% account from marketing efforts. The goal is to conduct a timer series analysis to determine during which periods can this product benefit from promotions and then forecast the difference that marketing efforts can have on upcoming months. The generated information can serve as critical information for businesses to ensure sufficient inventory, confirm marketing efforts successful, understand the impact of promotions, determine seasonality, and increase sales. As a stakeholder overseeing four national pasta brands, I would want to find strategies to best improve ROI on promotional efforts for product QTY_B2_12 to increase sales to outperform the bottom 10% of products.
