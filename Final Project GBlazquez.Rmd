@@ -1,0 +1,678 @@
+---
+title: "ADS506 Final Proyect"
+author: "Gonzalo Blazquez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(forecast)
+library(zoo)
+library(lubridate)
+
+set.seed(506)
+```
+
+```{r}
+# Import the data set
+df <- read.csv('/Users/Gonzalo B/Downloads/Applied_Time_Series_Analysis/TeamProject/hierarchical_sales_data.csv')
+
+# Display the first rows
+head(df)
+```
+
+```{r}
+# Display the total range of the dates for all 118 observations
+start_date <- head(df$DATE, 1)
+end_date <- tail(df$DATE, 1)
+cat('The sales in this dataset range from ', start_date, 'to', end_date)
+```
+
+```{r}
+# Check for missing values
+sum(is.na(df))
+```
+
+```{r}
+# Convert the date column to the correct format
+df$DATE <- as.Date(df$DATE)
+
+# Display the output for verification
+head(df)
+```
+
+```{r}
+# Sum all products quantities by day
+date_sum <- df |>
+  select(starts_with("QTY_B")) |>
+  rowSums(na.rm = TRUE)
+
+# Create df with the sums
+date_total <- data.frame(
+  df$DATE,
+  Sales_Sum = unlist(date_sum)
+)
+date_total
+```
+
+```{r}
+# Add the month column
+data_new1 <- date_total                                
+data_new1$year_month <- floor_date(data_new1$df.DATE,  
+                                   "month")
+#head(data_new1)                                     
+
+# Create new df that aggregates data by month
+data_aggr1 <- data_new1 |>                         
+  group_by(year_month) |> 
+  dplyr::summarize(Sales_Sum = sum(Sales_Sum))|> 
+  as.data.frame()
+
+#head(data_aggr1)
+
+# Plot monthly sales 
+sales.ts <- ts(data_aggr1$Sales_Sum, start = c(2014,1), end = c(2018,12), freq = 12)
+plot(sales.ts, main="Total Sales over five years" ,
+     xlab = "Months", ylab = "Sales",
+     ylim = c(4000, 20000), bty = "l")
+
+# Plot yearly seasons 
+ggseasonplot(sales.ts, year.labels=TRUE, year.labels.left=TRUE) +
+  ylab("Sales") +
+  ggtitle("Seasonal plot: monthly sales")
+```
+
+```{r}
+# Create df with the sum of sales and promo by brand for each day
+# Sales
+date_sum_b1 <- df |>
+  select(starts_with("QTY_B1")) |>
+  rowSums(na.rm = TRUE)
+date_sum_b2 <- df |>
+  select(starts_with("QTY_B2")) |>
+  rowSums(na.rm = TRUE)
+date_sum_b3 <- df |>
+  select(starts_with("QTY_B3")) |>
+  rowSums(na.rm = TRUE)
+date_sum_b4 <- df |>
+  select(starts_with("QTY_B4")) |>
+  rowSums(na.rm = TRUE)
+# Promos
+date_sum_pb1 <- df |>
+  select(starts_with("PROMO_B1")) |>
+  rowSums(na.rm = TRUE)
+date_sum_pb2 <- df |>
+  select(starts_with("PROMO_B2")) |>
+  rowSums(na.rm = TRUE)
+date_sum_pb3 <- df |>
+  select(starts_with("PROMO_B3")) |>
+  rowSums(na.rm = TRUE)
+date_sum_pb4 <- df |>
+  select(starts_with("PROMO_B4")) |>
+  rowSums(na.rm = TRUE)
+
+# df
+date_total_B <- data.frame(
+  df$DATE,
+  Sales_Sum = unlist(date_sum),
+  Sales_Sum_b1 = unlist(date_sum_b1),
+  Sales_Sum_b2 = unlist(date_sum_b2),
+  Sales_Sum_b3 = unlist(date_sum_b3),
+  Sales_Sum_b4 = unlist(date_sum_b4),
+  Promo_Sum_b1 = unlist(date_sum_pb1),
+  Promo_Sum_b2 = unlist(date_sum_pb2),
+  Promo_Sum_b3 = unlist(date_sum_pb3),
+  Promo_Sum_b4 = unlist(date_sum_pb4)
+ 
+)
+date_total_B
+```
+
+```{r}
+# Create a new column for the month
+date_total_B$Month <- format(df$DATE, "%Y-%m")
+
+# Group by month and calculate the sum
+monthly_sum <- date_total_B |>
+  group_by(Month) |>
+  summarise(
+    Sales_Sum = sum(Sales_Sum),
+    Sales_Sum_b1 = sum(Sales_Sum_b1),
+    Sales_Sum_b2 = sum(Sales_Sum_b2),
+    Sales_Sum_b3 = sum(Sales_Sum_b3),
+    Sales_Sum_b4 = sum(Sales_Sum_b4),
+    Promo_Sum_b1 = sum(Promo_Sum_b1),
+    Promo_Sum_b2 = sum(Promo_Sum_b2),
+    Promo_Sum_b3 = sum(Promo_Sum_b3),
+    Promo_Sum_b4 = sum(Promo_Sum_b4)
+  )
+monthly_sum
+```
+
+```{r}
+# Plot monthly sales by brand
+sales_b.ts2 <- ts(monthly_sum[,c(3:6)], start = c(2014,1), end = c(2018,12), freq = 12)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Months", ylab = "Sales", main = "Monthly Sales by Brand")
+legend("topright", colnames(sales_b.ts2), lty = 1, col = 1:4, bty = "n")
+```
+
+```{r}
+# Plot monthly promos by brand
+sales_b.ts2 <- ts(monthly_sum[,c(7:10)], start = c(2014,1), end = c(2018,12), freq = 12)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Month", ylab = "Promos", main = "Monthly Promos by Brand")
+legend("topleft", colnames(sales_b.ts2), lty = 1, col = 1:4, bty = "n")
+```
+
+```{r}
+# Create the week and year columns
+date_total_B$Week <- week(date_total_B$df.DATE)
+date_total_B$Year <- year(date_total_B$df.DATE)
+
+# Group by Week and summarize
+weekly_sum <- date_total_B |>
+  group_by(Year, Week) |>
+  summarize(
+    Sales_Sum = sum(Sales_Sum),
+    Sales_Sum_b1 = sum(Sales_Sum_b1),
+    Sales_Sum_b2 = sum(Sales_Sum_b2),
+    Sales_Sum_b3 = sum(Sales_Sum_b3),
+    Sales_Sum_b4 = sum(Sales_Sum_b4),
+    Promo_Sum_b1 = sum(Promo_Sum_b1),
+    Promo_Sum_b2 = sum(Promo_Sum_b2),
+    Promo_Sum_b3 = sum(Promo_Sum_b3),
+    Promo_Sum_b4 = sum(Promo_Sum_b4)
+  )
+weekly_sum
+```
+
+```{r}
+# Plot
+sales_b.ts2 <- ts(weekly_sum[,c(4:7)], start = c(2014,1), end = c(2018,52), freq = 52)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Week", ylab = "Sales", main = "Weekly Sales by Brand")
+legend("topleft", colnames(sales_b.ts2), lty = 1, col = 1:4, bty = "n")
+```
+
+```{r}
+# Plot
+sales_b.ts2 <- ts(weekly_sum[,c(8:11)], start = c(2014,1), end = c(2018,52), freq = 52)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Week", ylab = "Promos", main = "Weekly Promos by Brand")
+legend("topleft", colnames(sales_b.ts2), lty = 1, col = 1:4, bty = "n")
+```
+
+```{r}
+# Scatter plot
+ggplot(weekly_sum, aes(x = Promo_Sum_b1, y = Sales_Sum_b1)) +
+  geom_point() +
+  labs(title = paste("Scatter Plot of Weekly Sales vs Weekly Promos for B1"),
+       x = "Weekly Promos",
+       y = "Weekly Sales") +
+  theme_minimal()
+```
+
+```{r}
+# Create df for the products of brand 1
+# B1 sales quantities
+date_sumB1 <- df |>
+  select(starts_with("QTY_B1"))
+
+date_totalB1 <- data.frame(
+  df$DATE,
+  Sales_Sum = date_sumB1
+)
+# B1 promos
+date_promoB1 <- df |>
+  select(starts_with("PROMO_B1"))
+
+date_totalPB1 <- data.frame(
+  df$DATE,
+  Sales_Sum = date_promoB1
+)
+# Unpivot sales and promos
+df_long <- reshape(date_totalB1, idvar = "df.DATE", varying = list(names(date_totalB1)[-1]), v.names = "Sales", direction = "long", timevar = "Product")
+df_long_Pr <- reshape(date_totalPB1, idvar = "df.DATE", varying = list(names(date_totalPB1)[-1]), v.names = "Promo", direction = "long", timevar = "Product")
+# Rename the Category column
+df_long$Product <- gsub("Sales_Sum.QTY_B1_", "", df_long$Product)
+df_long_Pr$Product <- gsub("Sales_Sum.PROMO_B1_", "", df_long_Pr$Product)
+# Join sales and promos
+result_P_b1 <- left_join(df_long, df_long_Pr, by = c("df.DATE","Product"))
+
+result_P_b1
+```
+
+```{r}
+# Plot sales for a product 
+product <- "3"
+
+# Filter the dataframe for the specified category and Quantity.y is 0
+df_filtered <- subset(result_P_b1, Product == product)
+
+# Plot with different colors for Quantity.y
+ggplot(df_filtered, aes(x = df.DATE, y = Sales, color = factor(Promo))) +
+  geom_point() +
+  labs(title = paste("Scatter Plot for Product", product),
+       x = "Date",
+       y = "Sales",
+       color = "Promo") +
+  theme_minimal()
+```
+
+```{r}
+# Plot sales for a product 
+product <- "12"
+
+# Filter the dataframe for the specified category and Quantity.y is 0
+df_filtered <- subset(result_P_b1, Product == product)
+
+# Plot with different colors for Quantity.y
+ggplot(df_filtered, aes(x = df.DATE, y = Sales, color = factor(Promo))) +
+  geom_point() +
+  labs(title = paste("Scatter Plot for Product", product),
+       x = "Date",
+       y = "Sales",
+       color = "Promo") +
+  theme_minimal()
+```
+
+```{r}
+# Get the average monthly sales by product and promo
+df_avg_sales_monthly <- result_P_b1 |>
+  mutate(Month = floor_date(df.DATE, unit = "month")) |>  
+  group_by(Product, Month, Promo) |>
+  summarize(Avg_Sales = mean(Sales))
+
+# Filter for Promo equal to 0 and 1
+sales_monthly_promo0 <- filter(df_avg_sales_monthly, Promo == 0)
+sales_monthly_promo1 <- filter(df_avg_sales_monthly, Promo == 1)
+# Join tables to get the desired format
+monthly_avg_promo <- left_join(sales_monthly_promo0, sales_monthly_promo1, by = c("Month","Product"))
+
+# Create column with the promo effect
+monthly_avg_promo$Promo_effect <- ifelse(monthly_avg_promo$Avg_Sales.x == 0, 1, monthly_avg_promo$Avg_Sales.y / monthly_avg_promo$Avg_Sales.x)
+# Change column names
+colnames(monthly_avg_promo)[colnames(monthly_avg_promo) == "Avg_Sales.x"] <- "Avg_Sales_No_promo"
+colnames(monthly_avg_promo)[colnames(monthly_avg_promo) == "Avg_Sales.y"] <- "Avg_Sales_promo"
+#promo effect table
+monthly_avg_promo
+```
+
+```{r}
+# Add month column
+result_P_b1 <- result_P_b1 |>
+  mutate(Month = floor_date(df.DATE, unit = "month"))   
+  
+# Join the table with b1 product with the promo effect table
+result_promo <- left_join(result_P_b1, monthly_avg_promo, by = c("Month","Product"))
+# If promo effect is NA replace with 1
+result_promo$Promo_effect <- ifelse(is.na(result_promo$Promo_effect), 1, result_promo$Promo_effect)
+# Create a sales with promo and no promo columns
+result_promo$Sales_NoPromo <- ifelse(result_promo$Promo == 0, result_promo$Sales, result_promo$Sales/result_promo$Promo_effect)
+result_promo$Sales_Promo <- ifelse(result_promo$Promo == 1, result_promo$Sales, result_promo$Sales*result_promo$Promo_effect)
+# Remove redundant columns for promo
+result_promo <- result_promo[,-c(6,8)]
+
+result_promo
+```
+
+```{r}
+# Analize the new data by month
+data_new3 <- result_promo |>
+  select(df.DATE, Sales, Sales_NoPromo, Sales_Promo)
+
+data_new3$year_month <- floor_date(data_new3$df.DATE,  
+                                   "month")
+#head(data_new3)                                     
+# df to compare different sales scenarios
+data_aggr3 <- data_new3 |>                        
+  group_by(year_month) |> 
+  dplyr::summarize(
+    Sales = sum(Sales),
+    Sales_NoPromo = sum(Sales_NoPromo),
+    Sales_Promo = sum(Sales_Promo)
+    ) |> 
+  as.data.frame()
+
+#head(data_aggr3) 
+# Plot
+sales_b.ts2 <- ts(data_aggr3[,c(2:4)], start = c(2014,1), end = c(2018,12), freq = 12)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:3, xlab = "Month", ylab = "Sales", main = "Sales in three scenarios")
+legend("topleft", colnames(sales_b.ts2), lty = 1, col = 1:3, bty = "n")
+```
+
+```{r}
+# Create the product ranking by promo effect
+rank_pro <- result_promo |>
+  group_by(Product) |>
+  summarize(Avg_Promo_effect = mean(Promo_effect, na.rm = TRUE))|>
+  arrange(desc(Avg_Promo_effect))
+# Get the upper half
+upper_half <- rank_pro[1:21, ]$Product
+
+head(rank_pro)
+tail(rank_pro)
+upper_half
+```
+
+```{r}
+# Create the mix promo column
+
+result_promo$Sales_MixPromo <- ifelse(result_promo$Product %in% upper_half, result_promo$Sales_Promo, result_promo$Sales_NoPromo)
+# Aggregate data by day
+data_aggr_day <- result_promo |>                         
+  group_by(df.DATE) |> 
+  dplyr::summarize(
+    Sales = sum(Sales),
+    Sales_NoPromo = sum(Sales_NoPromo),
+    Sales_Promo = sum(Sales_Promo),
+    Sales_MixPromo = sum(Sales_MixPromo)
+    ) |> 
+  as.data.frame()
+
+# Create df with sales columns
+data_new3 <- result_promo |>
+  select(df.DATE, Sales, Sales_NoPromo, Sales_Promo, Sales_MixPromo)
+# Create year-month column
+data_new3$year_month <- floor_date(data_new3$df.DATE,  
+                                   "month")
+# Aggregate data by month
+data_aggr3 <- data_new3 |>                         
+  group_by(year_month) |> 
+  dplyr::summarize(
+    Sales = sum(Sales),
+    Sales_NoPromo = sum(Sales_NoPromo),
+    Sales_Promo = sum(Sales_Promo),
+    Sales_MixPromo = sum(Sales_MixPromo)
+    ) |> 
+  as.data.frame()
+
+head(data_aggr3) 
+# Plot monthly sales 
+sales_b.ts2 <- ts(data_aggr3[,c(2:5)], start = c(2014,1), end = c(2018,12), freq = 12)
+sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Month", ylab = "Sales", main = "Sales in four scenarios")
+legend("topleft", colnames(sales_b.ts2), lty = 1, col = 1:4, bty = "n")
+# Plot daily sales
+sales_b.ts2 <- ts(data_aggr_day[,c(2:5)], start = c(2014,1), end = c(2018,365), freq = 365)
+#sales_b.ts2
+ts.plot(sales_b.ts2, col = 1:4, xlab = "Date", ylab = "Sales", main = "Sales in four scenarios", xlim = c(2014, 2019), ylim = c(0, 1500))
+legend("topleft", colnames(sales_b.ts2), lty = 1, col = 1:4, bty = "n")
+
+```
+
+```{r}
+# Define the time series to work with the models
+sales_b.ts2 <- ts(data_aggr_day[,c(2:5)], start = c(2014,1), end = c(2018,365), freq = 365)
+head(sales_b.ts2)
+# Regular sales
+train_sale_ts <- window(sales_b.ts2[,c(1:1)], end = c(2017,365))
+valid_sale_ts <- window(sales_b.ts2[,c(1:1)], start = c(2018,1))
+# Promo Mix
+train_sale_pr <- window(sales_b.ts2[,c(4:4)], end = c(2017,365))
+valid_sale_pr <- window(sales_b.ts2[,c(4:4)], start = c(2018,1))
+# Total Series
+train_sale_ts_Mix <- window(sales_b.ts2[,c(4:4)], end = c(2018,365))
+train_sale_ts_Reg <- window(sales_b.ts2[,c(1:1)], end = c(2018,365))
+
+```
+
+```{r}
+# Linear Model for Sales
+
+# Fit
+regsales.lm.model <- tslm(train_sale_ts ~ trend + season, train_sale_ts)
+
+summary(regsales.lm.model)
+# Forecast
+regsales.lm.pred <- forecast(regsales.lm.model, h = 365)
+# Plot
+autoplot(train_sale_ts, series = 'train') +
+  autolayer(valid_sale_ts, series = 'actual') +
+  autolayer(regsales.lm.pred$mean, series = 'prediction', alpha=.8) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2017, 2019),ylim = c(0, 750)) +
+  labs(title = "Forecast for Sales")+
+  ylab("Sales")+
+  xlab("Date")
+# Measures
+LM_Sales_ac <- accuracy(regsales.lm.pred, valid_sale_ts)
+```
+
+```{r}
+# Linear Model for Sales with mix promo
+
+# Fit
+mixsales.lm.model <- tslm(train_sale_pr ~ trend + season, train_sale_ts)
+
+summary(mixsales.lm.model)
+# Forecast
+mixsales.lm.pred <- forecast(mixsales.lm.model, h = 365)
+# Plot
+autoplot(train_sale_pr, series = 'train') +
+  autolayer(valid_sale_pr, series = 'actual') +
+  autolayer(mixsales.lm.pred$mean, series = 'prediction', alpha=.8) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2017, 2019)) +
+  labs(title = "Forecast for Sales with Mix Promo")+
+  ylab("Sales")+
+  xlab("Date")
+# Measures
+LM_Mix_ac <- accuracy(mixsales.lm.pred, valid_sale_pr)
+```
+
+```{r}
+# ARIMA Model
+arima_model <- auto.arima(train_sale_ts)
+```
+
+```{r}
+# Display the model summary
+summary(arima_model)
+
+# Forecast
+forecast_values <- forecast(arima_model, h = 365)
+
+autoplot(train_sale_ts, series = 'train') +
+  autolayer(valid_sale_ts, series = 'actual') +
+  autolayer(forecast_values$mean, series = 'prediction', alpha=.4) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2017, 2019),ylim = c(0, 750)) +
+  labs(title = "Forecast for Sales")+
+  ylab("Sales")+
+  xlab("Date")
+# Measures
+AR_Sales_ac <- accuracy(forecast_values, valid_sale_ts)
+```
+
+```{r}
+# ARIMA Model for Sales with mix promo
+arima_model_pr <- auto.arima(train_sale_pr)
+```
+
+```{r}
+# Display the model summary
+summary(arima_model_pr)
+
+# Forecast
+forecast_values <- forecast(arima_model_pr, h = 365)
+
+autoplot(train_sale_pr, series = 'train') +
+  autolayer(valid_sale_pr, series = 'actual') +
+  autolayer(forecast_values$mean, series = 'prediction', alpha=.4) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2017, 2019)) +
+  labs(title = "Forecast for Sales with mix promo")+
+  ylab("Sales")+
+  xlab("Date")
+# Measures
+AR_Mix_ac <- accuracy(forecast_values, valid_sale_pr)
+```
+
+```{r}
+#commented for knit purpose
+# Neural Network loop to find the best parameters based on the lowest RMSE
+#best_rmse <- Inf
+#best_model <- NULL
+
+#for (p in seq(1, 20)) {
+  #for (P in seq(1, 5)) {
+    #for (size in seq(5, 20, by = 5)) {
+      #nnetar_model <- nnetar(train_sale_ts, p = p, P = P, size = size)
+      #forecast_values <- forecast(nnetar_model,365)
+      #rmse <- sqrt(mean((forecast_values$mean - valid_sale_ts)^2))
+
+      #if (rmse < best_rmse) {
+        #best_rmse <- rmse
+        #best_model <- nnetar_model
+      #}
+    #}
+  #}
+#}
+```
+
+```{r}
+best_model
+best_rmse
+```
+
+```{r}
+# Forecast
+pasta.nnetar.pred <- forecast(best_model, h = 365)
+
+# Plot
+autoplot(train_sale_ts, series = 'train') +
+  autolayer(valid_sale_ts, series = 'actual') +
+  autolayer(pasta.nnetar.pred$mean, series = 'prediction', alpha=.6) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2017, 2019),ylim = c(0, 750)) +
+  labs(title = "Forecast for Sales")+
+  ylab("Sales")+
+  xlab("Date")
+# Measures
+NN_Sales_ac <- accuracy(pasta.nnetar.pred, valid_sale_ts)
+```
+
+```{r}
+#commented for knit purpose
+# Mix Promo Neural network
+# Neural Network loop to find the best parameters based on the lowest RMSE
+#best_rmse <- Inf
+#best_model_pr <- NULL
+
+#for (p in seq(1, 20)) {
+  #for (P in seq(1, 5)) {
+    #for (size in seq(5, 20, by = 5)) {
+      #nnetar_model <- nnetar(train_sale_pr, p = p, P = P, size = size, parallel = TRUE)
+      #forecast_values <- forecast(nnetar_model,365)
+      #rmse <- sqrt(mean((forecast_values$mean - valid_sale_pr)^2))
+
+      #if (rmse < best_rmse) {
+        #best_rmse <- rmse
+        #best_model_pr <- nnetar_model
+      #}
+    #}
+  #}
+#}
+```
+
+```{r}
+best_model_pr
+best_rmse
+```
+
+```{r}
+# Forecast
+pasta.nnetar.pred <- forecast(best_model_pr, h = 365)
+
+# Plot
+autoplot(train_sale_pr, series = 'train') +
+  autolayer(valid_sale_pr, series = 'actual') +
+  autolayer(pasta.nnetar.pred$mean, series = 'prediction', alpha=.4) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2017, 2019)) +
+  labs(title = "Forecast for Sales with Mix Promo")+
+  ylab("Sales")+
+  xlab("Date")
+# Measures
+NN_Mix_ac <- accuracy(pasta.nnetar.pred, valid_sale_pr)
+```
+
+```{r}
+# Create tables with accuracy measures for Sales
+accuracy_train <- data.frame(
+  Model = c("Linear Model", "ARIMA Model", "Neural Network Model"),
+  ME_train = c(LM_Sales_ac["Training set", "ME"], AR_Sales_ac["Training set", "ME"], NN_Sales_ac["Training set", "ME"]),
+  RSME_train = c(LM_Sales_ac["Training set", "RMSE"], AR_Sales_ac["Training set", "RMSE"], NN_Sales_ac["Training set", "RMSE"]),
+  MAE_train = c(LM_Sales_ac["Training set", "MAE"], AR_Sales_ac["Training set", "MAE"], NN_Sales_ac["Training set", "MAE"])
+)
+accuracy_train
+accuracy_test <- data.frame(
+  Model = c("Linear Model", "ARIMA Model", "Neural Network Model"),
+  ME_test = c(LM_Sales_ac["Test set", "ME"], AR_Sales_ac["Test set", "ME"], NN_Sales_ac["Test set", "ME"]),
+  RSME_test = c(LM_Sales_ac["Test set", "RMSE"], AR_Sales_ac["Test set", "RMSE"], NN_Sales_ac["Test set", "RMSE"]),
+  MAE_test = c(LM_Sales_ac["Test set", "MAE"], AR_Sales_ac["Test set", "MAE"], NN_Sales_ac["Test set", "MAE"])
+)
+accuracy_test
+```
+
+```{r}
+# Create tables with accuracy measures for Mix Promos
+accuracy_train_mix <- data.frame(
+  Model = c("Linear Model", "ARIMA Model", "Neural Network Model"),
+  ME_train = c(LM_Mix_ac["Training set", "ME"], AR_Mix_ac["Training set", "ME"], NN_Mix_ac["Training set", "ME"]),
+  RSME_train = c(LM_Mix_ac["Training set", "RMSE"], AR_Mix_ac["Training set", "RMSE"], NN_Mix_ac["Training set", "RMSE"]),
+  MAE_train = c(LM_Mix_ac["Training set", "MAE"], AR_Mix_ac["Training set", "MAE"], NN_Mix_ac["Training set", "MAE"])
+)
+accuracy_train_mix
+accuracy_test_mix <- data.frame(
+  Model = c("Linear Model", "ARIMA Model", "Neural Network Model"),
+  ME_test = c(LM_Mix_ac["Test set", "ME"], AR_Mix_ac["Test set", "ME"], NN_Mix_ac["Test set", "ME"]),
+  RSME_test = c(LM_Mix_ac["Test set", "RMSE"], AR_Mix_ac["Test set", "RMSE"], NN_Mix_ac["Test set", "RMSE"]),
+  MAE_test = c(LM_Mix_ac["Test set", "MAE"], AR_Mix_ac["Test set", "MAE"], NN_Mix_ac["Test set", "MAE"])
+)
+accuracy_test_mix
+```
+
+```{r}
+# Final Model forecast
+
+# Fit
+mixsales.model <- tslm(train_sale_ts_Mix ~ trend + season, train_sale_ts_Mix)
+regsales.model <- tslm(train_sale_ts_Reg ~ trend + season, train_sale_ts_Reg)
+#regsales.model <- nnetar(train_sale_ts_Reg, p = 9, P = 3, size =10)
+
+#summary(mixsales.lm.model2)
+# Forecast
+mixsales.pred <- forecast(mixsales.model, h = 365)
+regsales.pred <- forecast(regsales.model, h = 365)
+# Plot
+autoplot(train_sale_ts_Reg, series = 'actual') +
+  autolayer(regsales.pred$mean, series = 'regular prediction') +
+  autolayer(mixsales.pred$mean, series = 'new promo prediction', alpha=.8) +
+  theme_classic()  +
+  coord_cartesian(xlim = c(2018.5, 2020), ylim = c(0,550)) +
+  labs(title = "Forecast for Actual scenario vs New promo proposal")+
+  ylab("Sales")+
+  xlab("Date")
+
+```
+
+```{r}
+# Compare predictions
+anual_mix_sales <- sum(mixsales.pred$mean)
+anual_reg_sales <- sum(regsales.pred$mean)
+
+anual_mix_sales
+anual_reg_sales
+anual_mix_sales-anual_reg_sales
+(anual_mix_sales/anual_reg_sales)-1
+```
