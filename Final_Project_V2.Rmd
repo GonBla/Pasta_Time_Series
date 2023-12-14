@@ -2,7 +2,9 @@
 title: "ADS 506 Final Version 2"
 author: "Jesse Gutierrez"
 date: "2023-12-05"
-output: html_document
+output:
+  word_document: default
+  html_document: default
 ---
 
 ```{r}
@@ -33,7 +35,7 @@ As the dataset file was not available for download under the UCI repository, an 
 df <- read.csv('/Users/jesse/Downloads/Data for A machine learning approach for forecasting hierarchical time series/hierarchical_sales_data.csv')
 
 # Display the first few rows to see the format of the dates included
-head(df)
+#head(df)
 ```
 
 ```{r}
@@ -48,7 +50,7 @@ cat('The sales in this dataset range from ', start_date, 'to', end_date)
 df$DATE <- as.Date(df$DATE)
 
 # Display the output for verification
-head(df)
+#head(df)
 ```
 
 ```{r}
@@ -300,7 +302,7 @@ I chose to use the auto.arima() so that the model can determine the optimal (p, 
 arima_model_B1_above <- auto.arima(ts_training_set)
 
 # Print model summary
-summary(arima_model_B1_above) 
+#summary(arima_model_B1_above) 
 
 # Extract residuals from the model
 residuals <- residuals(arima_model_B1_above)
@@ -338,7 +340,7 @@ results_df <- data.frame(
 )
 
 # Display the results
-results_df
+head(results_df)
 ```
 Saving the predicted vs actual values in a dataframe to do a comparative plot
 
@@ -396,10 +398,10 @@ results_validation_df <- data.frame(
 )
 
 # Output the model's summary
-summary(arima_model_B1_above)
+#summary(arima_model_B1_above)
 
 # Display comparative table
-results_validation_df
+head(results_validation_df)
 ```
 Apply model to the validation set to test for the accuracy & overfitting concerns
 
@@ -442,10 +444,10 @@ results_B1_below_df <- data.frame(
 )
 
 # Print summary of the model
-summary(forecast_values_validation)
+#summary(forecast_values_validation)
 
 # Display comparative table
-results_B1_below_df
+head(results_B1_below_df)
 ```
 Now apply the model to the B1_below_ts dataset
 
@@ -470,7 +472,7 @@ ts_validation_set <- ts(validation_set$sum, frequency = 355) # Only has 355 valu
 unscaled_arima_model_B1_above <- auto.arima(ts_training_set)
 
 # Print model summary
-summary(unscaled_arima_model_B1_above) 
+#summary(unscaled_arima_model_B1_above) 
 
 # Extract residuals from the model
 residuals <- residuals(unscaled_arima_model_B1_above)
@@ -518,7 +520,7 @@ results_df <- data.frame(
 )
 
 # Display the results
-results_df
+head(results_df)
 ```
 
 
@@ -563,10 +565,10 @@ results_validation_df <- data.frame(
 )
 
 # Output the model's summary
-summary(unscaled_arima_model_B1_above)
+#summary(unscaled_arima_model_B1_above)
 
 # Display comparative table
-results_validation_df
+head(results_validation_df)
 ```
 Apply model to the validation set to test for the accuracy & overfitting concerns
 
@@ -593,10 +595,10 @@ results_B1_below_df <- data.frame(
 )
 
 # Print summary of the model
-summary(forecast_values_validation)
+#summary(forecast_values_validation)
 
 # Display comparative table
-results_B1_below_df
+head(results_B1_below_df)
 ```
 # Split B1 above data
 
@@ -672,7 +674,7 @@ results_df <- data.frame(
 )
 
 # Display the data frame
-results_df
+head(results_df)
 
 # Plot above results
 ggplot(results_df, aes(x = Date)) +
@@ -714,7 +716,7 @@ results_df <- data.frame(
 )
 
 # Display the data frame
-results_df
+head(results_df)
 
 # Plot above results
 ggplot(results_df, aes(x = Date)) +
@@ -801,7 +803,7 @@ results_df <- data.frame(
 )
 
 # Display the data frame
-results_df
+head(results_df)
 
 # Plot above results
 ggplot(results_df, aes(x = Date)) +
@@ -843,7 +845,7 @@ results_df <- data.frame(
 )
 
 # Display the data frame
-results_df
+head(results_df)
 
 # Plot above results
 ggplot(results_df, aes(x = Date)) +
@@ -859,6 +861,16 @@ ggplot(results_df, aes(x = Date)) +
 # Predict difference in sales
 
 ```{r}
+# Calculate mean & std dev
+mean_training_above <- mean(B1_above$sum)
+sd_training_above <- sd(B1_above$sum)
+mean_training_below <- mean(B1_below$sum)
+sd_training_below <- sd(B1_below$sum)
+
+# Scale and center the sum columns 
+B1_above$sum <- scale(B1_above$sum, center = mean_training_above, scale = sd_training_above) 
+B1_below$sum <- scale(B1_below$sum, center = mean_training_below, scale = sd_training_below) 
+
 # Turn full duration into time series format 
 B1_above_ts_entire <- ts(B1_above$sum, frequency = 360) # 1798 rows/5 years = 360
 B1_below_ts_entire <- ts(B1_below$sum, frequency = 360) # 1798 rows/5 years = 360
@@ -912,7 +924,7 @@ results_df <- data.frame(
 )
 
 # Display the data frame
-results_df
+head(results_df)
 
 # Plot above results
 ggplot(results_df, aes(x = Date)) +
@@ -937,7 +949,7 @@ results_df <- data.frame(
 )
 
 # Display the data frame
-results_df
+head(results_df)
 
 # Plot above results
 ggplot(results_df, aes(x = Date)) +
@@ -994,63 +1006,5 @@ print(predicted_values_above)
 print("B1 Below Forecast:")
 print(predicted_values_below)
 ```
-
-# ARIMA model
-
-```{r}
-# Fit an ARIMA model to training subset
-arima_model_B1_above <- auto.arima(B1_above_ts_entire)
-arima_model_B1_below <- auto.arima(B1_below_ts_entire)
-
-# Print model summary
-summary(arima_model_B1_above) 
-summary(arima_model_B1_below) 
-
-# Generate forecasts using the ARIMA model
-forecast_values_above <- forecast(arima_model_B1_above, h = length(B1_above_ts_entire))
-forecast_values_below <- forecast(arima_model_B1_below, h = length(B1_below_ts_entire))
-
-# Create a data frame with actual vs predicted vs difference values
-results_above_df <- data.frame(
-  Date = B1_above$DATE,
-  Actual = B1_above_ts_entire,
-  Predicted = forecast_values_above$mean
-)
-results_below_df <- data.frame(
-  Date = B1_below$DATE,
-  Actual = B1_below_ts_entire,
-  Predicted = forecast_values_below$mean
-)
-
-# Display the results
-forecast_values_above
-forecast_values_below
-```
-
-```{r}
-# Plot above results
-ggplot(results_above_df, aes(x = Date)) +
-  geom_line(aes(y = Actual, color = "Actual"), linewidth = 1) +
-  geom_line(aes(y = Predicted, color = "Predicted"), linewidth = 1) +
-  labs(title = "B1 Above- Actual vs Predicted Time Series",
-       x = "Date",
-       y = "Value") +
-  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red")) +
-  theme_minimal()
-
-# Plot above results
-ggplot(results_below_df, aes(x = Date)) +
-  geom_line(aes(y = Actual, color = "Actual"), linewidth = 1) +
-  geom_line(aes(y = Predicted, color = "Predicted"), linewidth = 1) +
-  labs(title = "B1 Below- Actual vs Predicted Time Series",
-       x = "Date",
-       y = "Value") +
-  scale_color_manual(values = c("Actual" = "blue", "Predicted" = "red")) +
-  theme_minimal()
-```
-
-
-
-
 
 
